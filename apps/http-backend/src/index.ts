@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken"
 import { authenticate } from "./middleware/authenticate"
 import cookieparser from "cookie-parser"
 import { prismaClient } from "db/config"
-const JWT_SECRET = "123"
+import { JWT_SECRET } from "backend-common/config"
 const app = express()
 app.use(express.json())
 app.use(cookieparser())

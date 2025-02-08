@@ -1,8 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
-// import { JWT_SECRET } from "backend-common/config";
-const { prismaClient } =  require("db/config")
-const JWT_SECRET = "123"
+import { prismaClient } from "db/config";
+import { JWT_SECRET } from "backend-common/config"
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     try {
         console.log("Cookies received:", req.cookies);
