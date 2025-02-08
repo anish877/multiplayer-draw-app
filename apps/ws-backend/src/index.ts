@@ -1,8 +1,7 @@
 import {WebSocketServer } from "ws"
 import jwt, { JwtPayload } from "jsonwebtoken"
-import { JWT_SECRET } from "backend-common/config"
 const wss = new WebSocketServer({port:8080})
-
+const JWT_SECRET = "123"
 wss.on("connection",(ws,request)=>{
     const url = request.url
     const urlPramas = new URLSearchParams(url?.split("?")[1])

@@ -1,26 +1,26 @@
 import express, { Request, Response } from "express"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
-import { JWT_SECRET } from "backend-common/config"
 import { authenticate } from "./middleware/authenticate"
-import { User } from "./models/user.model"
-import mongoose from "mongoose"
 import cookieparser from "cookie-parser"
-
+import { prismaClient } from "db/config"
+const JWT_SECRET = "123"
 const app = express()
-mongoose.connect('mongodb+srv://anishsuman2305:prkWtCmC2yzmZqBk@cluster0.pdlbk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
 app.use(express.json())
 app.use(cookieparser())
 app.post("/signup", async (req: Request, res: Response) => {
-    const username : string = req.body.username;
+    const email : string = req.body.email;
     const password : string = req.body.password
-    if (!username)
+    const name : string = req.body.name
+    if (!email || !name)
     {
-      res.status(400).json({ message: "Username required" });
+      res.status(400).json({ message: "email and name required" });
       return 
     }
-    const user = await User.findOne({
-      username
+    const user = await prismaClient.user.findUnique({
+      where:{
+        email: email
+      }
     })
     console.log(user)
     //@ts-ignore
@@ -40,11 +40,14 @@ app.post("/signup", async (req: Request, res: Response) => {
         return 
       }
       try {
-        const user = await User.create({
-          username: username,
-          password: hash
+        await prismaClient.user.create({
+          data:{
+            email: email,
+            password: hash,
+            name: name
+          }
         });
-        res.status(200).json({ user:user.username });
+        res.status(200).json({ name, email });
       } catch (dbError) {
         console.log(dbError)
         res.status(500).json({ message: "Error creating user" });
@@ -54,10 +57,10 @@ app.post("/signup", async (req: Request, res: Response) => {
 
 
   app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
   
-    if (!username) {
-      res.status(400).json({ message: "Username required" });
+    if (!email) {
+      res.status(400).json({ message: "Email required" });
       return 
     }
     if (!password) {
@@ -66,7 +69,7 @@ app.post("/signup", async (req: Request, res: Response) => {
     }
   
     try {
-      const user = await User.findOne({ username });
+      const user = await prismaClient.user.findUnique({ where:{email} });
   
       if (!user) {
         res.status(400).json({ message: "User not found" });
@@ -82,9 +85,9 @@ app.post("/signup", async (req: Request, res: Response) => {
       }
   
       // Generate JWT token
-      const token = jwt.sign({ username: user.username }, JWT_SECRET);
+      const token = jwt.sign({ email, name: user.name }, JWT_SECRET);
       res.cookie("uuid", token);
-      res.status(200).json({ username:user.username });
+      res.status(200).json({ email, name: user.name });
   
     } catch (dbError) {
       console.log(dbError);
