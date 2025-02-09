@@ -102,7 +102,7 @@ app.post("/create-room", authenticate, async (req: Request, res: Response) => {
     }
 });
 
-app.get("/chats/:roomdId",authenticate,async (req,res)=>{
+app.get("/chats/:roomdId",async (req,res)=>{
   if(!req.params.roomdId){
     res.status(400).json({message : "room id required"})
     return
@@ -119,6 +119,21 @@ app.get("/chats/:roomdId",authenticate,async (req,res)=>{
   })
 
   res.status(200).json({messages})
+})
+
+
+app.get("/room/:slug",async (req,res)=>{
+  if(!req.params.slug){
+    res.status(400).json({message : "room name required"})
+    return
+  }
+  const slug = req.params.slug
+  const room = await prismaClient.room.findUnique({
+    where:{
+      slug : slug
+    }
+  })
+  res.status(200).json({room})
 })
 
 app.listen(3001, () => {

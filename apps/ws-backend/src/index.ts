@@ -16,6 +16,7 @@ wss.on("connection",(ws,request)=>{
     const url = request.url
     const urlPramas = new URLSearchParams(url?.split("?")[1])
     const token = urlPramas.get("token") || ""
+    console.log(token)
     const decoded = jwt.verify(token,JWT_SECRET) as JwtPayload
     console.log(decoded)
     if(!decoded || !decoded.email){
@@ -30,6 +31,7 @@ wss.on("connection",(ws,request)=>{
     ws.on("error",(error)=>console.log(error))
     ws.on("message",async (data : string)=>{
         const parsedData = await JSON.parse(data)
+        console.log(parsedData)
         if(parsedData.type==="join_room"){
             const user = users.find(user=>user.ws===ws)
             user?.rooms.push(parsedData.roomId)
@@ -43,7 +45,7 @@ wss.on("connection",(ws,request)=>{
         else if(parsedData.type==="chat"){
             users.forEach(user=>{
                 if(user.rooms.includes(parsedData.roomId)){
-                    user.ws.send(parsedData.message)
+                    user.ws.send(JSON.stringify({type:"chat",message:parsedData.message}))
                 }
             })
 
@@ -57,6 +59,5 @@ wss.on("connection",(ws,request)=>{
             
         }
         console.log(users)
-        ws.send("something")
     })
 })
