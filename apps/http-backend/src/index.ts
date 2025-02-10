@@ -5,10 +5,12 @@ import cookieParser from "cookie-parser";
 import { prismaClient } from "db/config";
 import { JWT_SECRET } from "backend-common/config";
 import { authenticate } from "./middleware/authenticate";
+import cors from "cors"
 
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors())
 
 app.post("/signup", async (req: Request, res: Response) => {
     const { email, password, name } = req.body;
@@ -63,7 +65,7 @@ app.post("/login", async (req: Request, res: Response) => {
 
         const token = jwt.sign({ id: user.id, email, name: user.name }, JWT_SECRET, { expiresIn: "1d" });
         res.cookie("uuid", token, { httpOnly: true, secure: true });
-        res.status(200).json({ email, name: user.name });
+        res.status(200).json({ email, name: user.name, token });
         return;
     } catch (error) {
         console.error(error);
