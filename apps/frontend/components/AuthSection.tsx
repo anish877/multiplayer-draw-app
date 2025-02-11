@@ -2,18 +2,26 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 import { BACKEND_URL } from '@/app/config'
+import { useAuth } from '@/app/auth/verify/token';
+import { useRouter } from 'next/navigation';
+
 
 const AuthSection = ({isSignUp}:{isSignUp:boolean}) => {
     const [name,setName] = useState("")
     const [email,setEmail] = useState("")
     const [password,setPassword] = useState("")
+    const {token,setToken,userId,setUserId} = useAuth()
+    const router = useRouter()
     const handleSignUp = async ()=>{
         const response = await axios.post(BACKEND_URL+"/signup",{name,email,password})
         console.log(response)
     }
     const handleLogin = async ()=>{
         const response = await axios.post(BACKEND_URL+"/login",{name,email,password})
-        console.log(response)
+        setToken(response.data.token)
+        setUserId(response.data.userId)
+        console.log(token)
+        router.push("/canvas/1")
     }
   return (
     <div className='flex flex-col gap-5 p-5 text-black'>

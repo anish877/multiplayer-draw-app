@@ -65,7 +65,7 @@ app.post("/login", async (req: Request, res: Response) => {
 
         const token = jwt.sign({ id: user.id, email, name: user.name }, JWT_SECRET, { expiresIn: "1d" });
         res.cookie("uuid", token, { httpOnly: true, secure: true });
-        res.status(200).json({ email, name: user.name, token });
+        res.status(200).json({ email, name: user.name, token , userId : user.id });
         return;
     } catch (error) {
         console.error(error);

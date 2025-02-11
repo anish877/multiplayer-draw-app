@@ -1,27 +1,10 @@
-'use client';
-import { initDraw } from '@/app/draw';
-import React, { useEffect, useRef, useState } from 'react'
+import RoomCanvas from '@/components/RoomCanvas';
 
-const Canvas = () => {
-    const canvasref = useRef<HTMLCanvasElement>(null)
-    const [type,setType] = useState("rect")
-    useEffect(()=>{
-        const canvas = canvasref.current
-        if(!canvas)
-            return
-        initDraw(canvas)
-    },[canvasref])
-  return (
-    <div >
-        <div>
-            <button onClick={()=>setType("circle")}>Circle</button>
-            <button onClick={()=>setType("rect")}>Rect</button>
-        </div>
-        <div>
-            <canvas ref={canvasref} height={800} width={2000} className='bg-white'></canvas>
-        </div>
-    </div>
-  )
+const Canvas = async ({params}:{params:{canvasId:string}}) => {
+    const roomId = (await params).canvasId
+    return (
+        <RoomCanvas roomId={roomId}/>
+    )
 }
 
 export default Canvas
