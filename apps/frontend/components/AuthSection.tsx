@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 import { BACKEND_URL } from '@/app/config'
-import { useAuth } from '@/app/auth/verify/token';
+import { useAuth } from '@/app/auth/verify/index';
 import { useRouter } from 'next/navigation';
 
 

@@ -1,5 +1,5 @@
 "use client";
-import { useAuth } from '@/app/auth/verify/token';
+import { useAuth } from '@/app/auth/verify/index';
 import { initDraw } from '@/app/draw'
 import React, { useEffect, useRef, useState } from 'react'
 
