@@ -121,8 +121,26 @@ app.get("/chats/:roomdId",async (req,res)=>{
   })
 
   res.status(200).json({messages})
-})
+}) 
 
+app.get("/chats/text_chats/:roomdId",async (req,res)=>{
+  if(!req.params.roomdId){
+    res.status(400).json({message : "room id required"})
+    return
+  }
+  const roomId = parseInt(req.params.roomdId)
+  const messages = await prismaClient.chat.findMany({
+    where:{
+      roomId : roomId
+    },
+    orderBy:{
+      id: "desc"
+    },
+    take: 50
+  })
+
+  res.status(200).json({messages})
+})
 
 app.get("/room/:slug",async (req,res)=>{
   if(!req.params.slug){
