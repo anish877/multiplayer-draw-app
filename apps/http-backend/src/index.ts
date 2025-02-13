@@ -116,8 +116,7 @@ app.get("/chats/:roomdId",async (req,res)=>{
     },
     orderBy:{
       id: "desc"
-    },
-    take: 50
+    }
   })
 
   res.status(200).json({messages})
@@ -129,15 +128,25 @@ app.get("/chats/text_chats/:roomdId",async (req,res)=>{
     return
   }
   const roomId = parseInt(req.params.roomdId)
-  const messages = await prismaClient.chat.findMany({
-    where:{
-      roomId : roomId
+  const messages = await prismaClient.text_Chat.findMany({
+    where: {
+      roomId: roomId,
     },
-    orderBy:{
-      id: "desc"
+    orderBy: {
+      id: "desc",
     },
-    take: 50
-  })
+    take: 50,
+    include: {
+      user: {
+        select: {
+          name: true
+        },
+      },
+    },
+  });
+  
+  console.log(messages);
+  
 
   res.status(200).json({messages})
 })

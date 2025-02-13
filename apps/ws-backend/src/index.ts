@@ -65,7 +65,7 @@ wss.on("connection",(ws,request)=>{
                 }
             })
 
-            await prismaClient.chat.create({
+            await prismaClient.text_Chat.create({
                 data:{
                     roomId: parseInt(parsedData.roomId),
                     message: parsedData.message,
