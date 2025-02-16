@@ -10,7 +10,7 @@ const AuthSection = ({isSignUp}:{isSignUp:boolean}) => {
     const [name,setName] = useState("")
     const [email,setEmail] = useState("")
     const [password,setPassword] = useState("")
-    const {token,setToken,userId,setUserId} = useAuth()
+    const {token,setToken,userId,setUserId,username,setUsername} = useAuth()
     const router = useRouter()
     const handleSignUp = async ()=>{
         const response = await axios.post(BACKEND_URL+"/signup",{name,email,password})
@@ -20,7 +20,9 @@ const AuthSection = ({isSignUp}:{isSignUp:boolean}) => {
         const response = await axios.post(BACKEND_URL+"/login",{name,email,password})
         setToken(response.data.token)
         setUserId(response.data.userId)
+        setUsername(response.data.name)
         console.log(token)
+        console.log(username)
         router.push("/canvas/1")
     }
   return (

@@ -3,6 +3,7 @@ import { WS_URL } from '@/app/config'
 import React, { useEffect, useState } from 'react'
 import CanvasComponent from './CanvasComponent'
 import { useAuth } from '@/app/auth/verify/index'
+import ChatSection from './ChatSection';
 
 const RoomCanvas = ({roomId}:{roomId:string}) => {
     const [socket,setSocket] = useState<WebSocket|null>(null)

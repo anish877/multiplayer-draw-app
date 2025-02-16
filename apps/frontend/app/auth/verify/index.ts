@@ -17,6 +17,13 @@ export const useAuth = () => {
         return "";
     });
 
+    const [username, setUsernameState] = useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("username") || "";
+        }
+        return "";
+    });
+
     // Function to update token
     const setToken = (newToken: string) => {
         setTokenState(newToken);
@@ -33,7 +40,15 @@ export const useAuth = () => {
         }
     };
 
-    // Load token and userId from localStorage on mount
+    // Function to update username
+    const setUsername = (newUsername: string) => {
+        setUsernameState(newUsername);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("username", newUsername);
+        }
+    };
+
+    // Load token, userId, and username from localStorage on mount
     useEffect(() => {
         if (typeof window !== "undefined") {
             const savedToken = localStorage.getItem("token");
@@ -41,8 +56,11 @@ export const useAuth = () => {
 
             const savedUserId = localStorage.getItem("userId");
             if (savedUserId) setUserIdState(savedUserId);
+
+            const savedUsername = localStorage.getItem("username");
+            if (savedUsername) setUsernameState(savedUsername);
         }
     }, []);
 
-    return { token, setToken, userId, setUserId };
+    return { token, setToken, userId, setUserId, username, setUsername };
 };
