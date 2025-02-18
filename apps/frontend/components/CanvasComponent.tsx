@@ -13,6 +13,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const textInputRef = useRef<HTMLTextAreaElement>(null);
+    const cleanupFunctionRef = useRef<(() => void) | null>(null);
     const [type, setType] = useState<ToolType>("select");
     const [showTextInput, setShowTextInput] = useState(false);
     const [textPosition, setTextPosition] = useState({ x: 0, y: 0 });
@@ -47,6 +48,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         const canvas = canvasRef.current;
         if (!canvas) return;
         
+        let cleanupTextListener: (() => void) | null = null;
+        
         // Handle text tool click
         const handleCanvasClick = (e: MouseEvent) => {
             if (type === "text") {
@@ -64,16 +67,32 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
 
         if (type === "text") {
             canvas.addEventListener("click", handleCanvasClick);
+            cleanupTextListener = () => {
+                canvas.removeEventListener("click", handleCanvasClick);
+            };
         }
 
-        initDraw(canvas, roomId, socket, userId, type);
-
-        return () => {
-            if (type === "text") {
-                canvas.removeEventListener("click", handleCanvasClick);
+        // Initialize drawing and get the cleanup function
+        const setupCanvas = async () => {
+            // If there's an existing cleanup function, call it first
+            if (cleanupFunctionRef.current) {
+                cleanupFunctionRef.current();
+                cleanupFunctionRef.current = null;
             }
+            
+            // Initialize drawing and store the new cleanup function
+            const cleanup = await initDraw(canvas, roomId, socket, userId, type);
+            cleanupFunctionRef.current = cleanup;
         };
-    }, [canvasRef, type]);
+        
+        setupCanvas();
+
+        // Return combined cleanup function
+        return () => {
+            if (cleanupTextListener) cleanupTextListener();
+            if (cleanupFunctionRef.current) cleanupFunctionRef.current();
+        };
+    }, [canvasRef, type, roomId, socket, userId]);
 
     const handleTextSubmit = () => {
         if (!textInputRef.current?.value) return;
@@ -86,7 +105,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 x: textPosition.x,
                 y: textPosition.y,
                 content: textContent,
-                color: "#ffffff" // You can add color selection later
+                color: "#ffffff", // You can add color selection later
+                id: Math.random().toString(36).substr(2, 9) // Add unique ID
             }),
             roomId,
             userId

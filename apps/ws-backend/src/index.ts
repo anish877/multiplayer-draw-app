@@ -58,6 +58,22 @@ wss.on("connection",(ws,request)=>{
             })
             
         }
+        else if(parsedData.type==="delete_chat"){
+            users.forEach(user=>{
+                if(user.rooms.includes(parsedData.roomId)){
+                    user.ws.send(JSON.stringify({type:"delete_chat",message:parsedData.message}))
+                }
+            })
+
+            await prismaClient.chat.deleteMany({
+                where:{
+                    roomId: parseInt(parsedData.roomId),
+                    message: parsedData.message,
+                    userId: parsedData.userId
+                }
+            })
+            
+        }
         else if(parsedData.type==="text_chat"){
             users.forEach(user=>{
                 if(user.rooms.includes(parsedData.roomId)){

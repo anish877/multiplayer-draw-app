@@ -71,12 +71,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
     socket.send(JSON.stringify(messageData));
     setMessageToSend('');
   }
+  console.log(messages)
 
   return (
     <div className="flex flex-col h-full bg-[#222222] text-white">
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-3">
           {messages.map((msg, index) => (
+            //@ts-ignore
+            (msg.type==="text_chat")?
             <div
               key={index}
               className={`flex flex-col max-w-[75%] ${
@@ -89,7 +92,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
               <div className="bg-[#2d2d2d] px-4 py-2 rounded-lg break-words">
                 <p className="text-base leading-6">{msg.message}</p>
               </div>
-            </div>
+            </div>:null
           ))}
           <div ref={messagesEndRef} />
         </div>
