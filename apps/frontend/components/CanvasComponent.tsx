@@ -4,10 +4,26 @@ import React, { useEffect, useRef, useState } from 'react';
 import ChatSection from './ChatSection';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Circle, Square, Pencil, MousePointer, FileImage, Type } from "lucide-react";
+import { Circle, Square, Pencil, MousePointer, FileImage, Type, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text";
+
+const CHALK_COLORS = [
+    '#ffffff', // white
+    '#f5c431', // yellow
+    '#f59331', // orange
+    '#f55031', // red
+    '#31f550', // green
+    '#31f5f5', // cyan
+    '#3165f5', // blue
+    '#9e31f5', // purple
+    '#ff69b4', // pink
+    '#808080', // gray
+    '#d4af37', // gold
+    '#40e0d0', // turquoise
+];
 
 const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -17,6 +33,10 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const [type, setType] = useState<ToolType>("select");
     const [showTextInput, setShowTextInput] = useState(false);
     const [textPosition, setTextPosition] = useState({ x: 0, y: 0 });
+    const [selectedColor, setSelectedColor] = useState(CHALK_COLORS[0]);
+    const [fontSize, setFontSize] = useState(16);
+    const [isBold, setIsBold] = useState(false);
+    const [isItalic, setIsItalic] = useState(false);
     const { userId } = useAuth();
 
     // Handle canvas resize
@@ -50,7 +70,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         
         let cleanupTextListener: (() => void) | null = null;
         
-        // Handle text tool click
         const handleCanvasClick = (e: MouseEvent) => {
             if (type === "text") {
                 const rect = canvas.getBoundingClientRect();
@@ -72,32 +91,34 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             };
         }
 
-        // Initialize drawing and get the cleanup function
         const setupCanvas = async () => {
-            // If there's an existing cleanup function, call it first
             if (cleanupFunctionRef.current) {
                 cleanupFunctionRef.current();
                 cleanupFunctionRef.current = null;
             }
             
-            // Initialize drawing and store the new cleanup function
-            const cleanup = await initDraw(canvas, roomId, socket, userId, type);
+            const cleanup = await initDraw(canvas, roomId, socket, userId, type, selectedColor);
             cleanupFunctionRef.current = cleanup;
         };
         
         setupCanvas();
 
-        // Return combined cleanup function
         return () => {
             if (cleanupTextListener) cleanupTextListener();
             if (cleanupFunctionRef.current) cleanupFunctionRef.current();
         };
-    }, [canvasRef, type, roomId, socket, userId]);
+    }, [canvasRef, type, roomId, socket, userId, selectedColor]);
 
     const handleTextSubmit = () => {
         if (!textInputRef.current?.value) return;
         
         const textContent = textInputRef.current.value;
+        const textStyle = {
+            fontSize,
+            isBold,
+            isItalic,
+        };
+
         socket.send(JSON.stringify({
             type: "chat",
             message: JSON.stringify({
@@ -105,8 +126,9 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 x: textPosition.x,
                 y: textPosition.y,
                 content: textContent,
-                color: "#ffffff", // You can add color selection later
-                id: Math.random().toString(36).substr(2, 9) // Add unique ID
+                color: selectedColor,
+                style: textStyle,
+                id: Math.random().toString(36).substr(2, 9)
             }),
             roomId,
             userId
@@ -115,6 +137,22 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         setShowTextInput(false);
         textInputRef.current.value = "";
     };
+
+    const ColorPicker = () => (
+        <div className="grid grid-cols-6 gap-2 p-2">
+            {CHALK_COLORS.map((color) => (
+                <button
+                    key={color}
+                    className={cn(
+                        "w-6 h-6 rounded-full border-2",
+                        color === selectedColor ? "border-white" : "border-transparent"
+                    )}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setSelectedColor(color)}
+                />
+            ))}
+        </div>
+    );
 
     const tools = [
         { type: "select", icon: MousePointer },
@@ -132,39 +170,87 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 className="absolute top-0 left-0 w-full h-full bg-[#222222]"
             />
 
-            {/* Text input overlay */}
+            {/* Text input overlay with formatting controls */}
             {showTextInput && (
-                <div 
+                <Card className="absolute z-20 bg-[#333333] border-[#444444]"
                     style={{
-                        position: "absolute",
                         left: textPosition.x,
                         top: textPosition.y,
-                        zIndex: 20
-                    }}
-                >
-                    <textarea
-                        ref={textInputRef}
-                        className="bg-[#333333] text-white border border-[#444444] p-2 rounded-md"
-                        rows={4}
-                        cols={30}
-                        placeholder="Enter text here..."
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleTextSubmit();
-                            }
-                            if (e.key === "Escape") {
-                                setShowTextInput(false);
-                            }
-                        }}
-                        onBlur={handleTextSubmit}
-                    />
-                </div>
+                    }}>
+                    <CardContent className="p-4">
+                        <div className="flex gap-2 mb-2">
+                            <select
+                                className="bg-[#444444] text-white px-2 py-1 rounded"
+                                value={fontSize}
+                                onChange={(e) => setFontSize(Number(e.target.value))}
+                            >
+                                {[12, 14, 16, 18, 20, 24, 28, 32].map(size => (
+                                    <option key={size} value={size}>{size}px</option>
+                                ))}
+                            </select>
+                            <Button
+                                variant={isBold ? "default" : "secondary"}
+                                size="sm"
+                                onClick={() => setIsBold(!isBold)}
+                                className="font-bold"
+                            >
+                                B
+                            </Button>
+                            <Button
+                                variant={isItalic ? "default" : "secondary"}
+                                size="sm"
+                                onClick={() => setIsItalic(!isItalic)}
+                                className="italic"
+                            >
+                                I
+                            </Button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="w-8 h-8"
+                                        style={{ backgroundColor: selectedColor }}
+                                    />
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <ColorPicker />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <textarea
+                            ref={textInputRef}
+                            className="bg-[#444444] text-white border border-[#555555] p-2 rounded-md w-full min-w-[200px]"
+                            rows={4}
+                            placeholder="Enter text here..."
+                            style={{
+                                fontSize: `${fontSize}px`,
+                                fontWeight: isBold ? 'bold' : 'normal',
+                                fontStyle: isItalic ? 'italic' : 'normal',
+                            }}
+                        />
+                        <div className="flex justify-end gap-2 mt-2">
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setShowTextInput(false)}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleTextSubmit}
+                            >
+                                <Check className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
-            {/* Tools overlay using shadcn Card */}
+            {/* Tools panel */}
             <Card className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#272727] w-auto z-10 border-[#3d3d3d]">
-                <CardContent className="flex flex-col gap-2 p-2">
+                <CardContent className="flex flex-col gap-2 p-2 justify-center items-center">
                     {tools.map((tool) => (
                         <Button
                             key={tool.type}
@@ -180,10 +266,22 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                             <tool.icon className="h-5 w-5" />
                         </Button>
                     ))}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="secondary"
+                                size="icon"
+                                className="w-7 h-7 m-1 rounded-full flex justify-center items-center"
+                                style={{ backgroundColor: selectedColor }}
+                            />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <ColorPicker />
+                        </PopoverContent>
+                    </Popover>
                 </CardContent>
             </Card>
 
-            {/* Chat box overlay using shadcn Card */}
             <Card className="absolute bottom-2 right-4 w-80 h-96 bg-[#222222] z-10 border-0 overflow-auto scrollbar-hide">
                 <ChatSection roomId={roomId} socket={socket}/>
             </Card>
@@ -192,3 +290,5 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
 };
 
 export default CanvasComponent;
+
+

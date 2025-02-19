@@ -35,7 +35,12 @@ type Shape = {
     y: number;
     content: string;
     color?: string;
-    id?: string; // Add unique ID for each shape
+    id?: string;
+    style?: {
+        fontSize: number;
+        isBold: boolean;
+        isItalic: boolean;
+    };
 }
 
 const CHALK_COLORS = [
@@ -612,13 +617,19 @@ function drawPencil(shape: Extract<Shape, {type: "pencil"}>, ctx: CanvasRenderin
 
 function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingContext2D) {
     ctx.save();
-    ctx.font = '16px sans-serif';
+    
+    // Apply text styles
+    const style = shape.style || { fontSize: 16, isBold: false, isItalic: false };
+    const fontWeight = style.isBold ? 'bold' : 'normal';
+    const fontStyle = style.isItalic ? 'italic' : 'normal';
+    ctx.font = `${fontStyle} ${fontWeight} ${style.fontSize}px sans-serif`;
+    
     ctx.fillStyle = shape.color || '#ffffff';
     ctx.textBaseline = 'top';
     
     // Split text into lines and draw each line
     const lines = shape.content.split('\n');
-    const lineHeight = 20;
+    const lineHeight = style.fontSize * 1.2; // Add some line spacing
     
     lines.forEach((line, index) => {
         ctx.fillText(line, shape.x, shape.y + (index * lineHeight));
@@ -626,6 +637,7 @@ function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingCon
     
     ctx.restore();
 }
+
 
 export default {
     initDraw,
