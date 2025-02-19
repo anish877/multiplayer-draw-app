@@ -47,6 +47,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
   async function fetchChatData(roomId: string) {
     try {
       const response = await axios.get(`${BACKEND_URL}/chats/text_chats/${roomId}`);
+      console.log(response)
       setMessages(response.data.messages);
     } catch (error) {
       console.error('Error fetching chat data:', error);
@@ -79,7 +80,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
         <div className="p-4 space-y-3">
           {messages.map((msg, index) => (
             //@ts-ignore
-            (msg.type==="text_chat")?
+            (!msg.type || msg.type==="text_chat")?
             <div
               key={index}
               className={`flex flex-col max-w-[75%] ${
