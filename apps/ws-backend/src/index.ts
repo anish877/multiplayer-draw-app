@@ -68,7 +68,6 @@ wss.on("connection",(ws,request)=>{
                     user.ws.send(JSON.stringify({type:"chat",message:parsedData.message}))
                 }
             })
-
             await prismaClient.chat.create({
                 data:{
                     roomId: parseInt(parsedData.roomId),

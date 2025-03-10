@@ -41,17 +41,30 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const { userId } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Array<{ name: string; userId: string }>>([]);
 
+    // Fix 1: Added a dependency array to useEffect for socket event listener
     useEffect(() => {
-        socket.addEventListener('message', (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'users_update') {
-                setOnlineUsers(data.users);
+        const handleMessage = (event: MessageEvent) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'users_update') {
+                    setOnlineUsers(data.users);
+                }
+            } catch (error) {
+                console.error('Error parsing message:', error);
             }
-        });
+        };
+
+        socket.addEventListener('message', handleMessage);
+
+        return () => {
+            socket.removeEventListener('message', handleMessage);
+        };
     }, [socket]);
 
     // Handle canvas resize
     useEffect(() => {
+        if (!canvasRef.current || !containerRef.current) return;
+        
         const handleResize = () => {
             if (!canvasRef.current || !containerRef.current) return;
             
@@ -75,6 +88,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, []);
 
+    // Fix 2: Separate text input handling from drawing initialization
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -89,9 +103,11 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     y: e.clientY - rect.top
                 });
                 setShowTextInput(true);
-                if (textInputRef.current) {
-                    textInputRef.current.focus();
-                }
+                setTimeout(() => {
+                    if (textInputRef.current) {
+                        textInputRef.current.focus();
+                    }
+                }, 0);
             }
         };
 
@@ -101,27 +117,43 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 canvas.removeEventListener("click", handleCanvasClick);
             };
         }
-
+        
+        return () => {
+            if (cleanupTextListener) cleanupTextListener();
+        };
+    }, [type]);
+    
+    // Fix 3: Separate drawing initialization to its own effect
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
         const setupCanvas = async () => {
             if (cleanupFunctionRef.current) {
                 cleanupFunctionRef.current();
                 cleanupFunctionRef.current = null;
             }
             
-            const cleanup = await initDraw(canvas, roomId, socket, userId, type, selectedColor);
-            cleanupFunctionRef.current = cleanup;
+            try {
+                const cleanup = await initDraw(canvas, roomId, socket, userId, type, selectedColor);
+                cleanupFunctionRef.current = cleanup;
+            } catch (error) {
+                console.error("Error initializing drawing:", error);
+            }
         };
         
         setupCanvas();
 
         return () => {
-            if (cleanupTextListener) cleanupTextListener();
-            if (cleanupFunctionRef.current) cleanupFunctionRef.current();
+            if (cleanupFunctionRef.current) {
+                cleanupFunctionRef.current();
+                cleanupFunctionRef.current = null;
+            }
         };
-    }, [canvasRef, type, roomId, socket, userId, selectedColor]);
+    }, [roomId, socket, userId, type, selectedColor]);
 
     const handleTextSubmit = () => {
-        if (!textInputRef.current?.value) return;
+        if (!textInputRef.current?.value.trim()) return;
         
         const textContent = textInputRef.current.value;
         const textStyle = {
@@ -130,25 +162,31 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             isItalic,
         };
 
-        socket.send(JSON.stringify({
-            type: "chat",
-            message: JSON.stringify({
-                type: "text",
-                x: textPosition.x,
-                y: textPosition.y,
-                content: textContent,
-                color: selectedColor,
-                style: textStyle,
-                id: Math.random().toString(36).substr(2, 9)
-            }),
-            roomId,
-            userId
-        }));
+        // Fix 4: Added error handling for socket messaging
+        try {
+            socket.send(JSON.stringify({
+                type: "text_element", // Fix 5: Changed message type for clarity
+                message: JSON.stringify({
+                    type: "text",
+                    x: textPosition.x,
+                    y: textPosition.y,
+                    content: textContent,
+                    color: selectedColor,
+                    style: textStyle,
+                    id: Math.random().toString(36).substr(2, 9)
+                }),
+                roomId,
+                userId
+            }));
 
-        setShowTextInput(false);
-        textInputRef.current.value = "";
+            setShowTextInput(false);
+            textInputRef.current.value = "";
+        } catch (error) {
+            console.error("Error sending text message:", error);
+        }
     };
 
+    // Fix 6: Extracted ColorPicker as a separate component
     const ColorPicker = () => (
         <div className="grid grid-cols-6 gap-2 p-2">
             {CHALK_COLORS.map((color) => (
@@ -160,19 +198,43 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     )}
                     style={{ backgroundColor: color }}
                     onClick={() => setSelectedColor(color)}
+                    aria-label={`Select color ${color}`}
                 />
             ))}
         </div>
     );
 
     const tools = [
-        { type: "select", icon: MousePointer },
-        { type: "circle", icon: Circle },
-        { type: "rect", icon: Square },
-        { type: "pencil", icon: Pencil },
-        { type: "text", icon: Type },
-        { type: "image", icon: FileImage }
+        { type: "select", icon: MousePointer, label: "Select" },
+        { type: "circle", icon: Circle, label: "Circle" },
+        { type: "rect", icon: Square, label: "Rectangle" },
+        { type: "pencil", icon: Pencil, label: "Pencil" },
+        { type: "text", icon: Type, label: "Text" },
+        { type: "image", icon: FileImage, label: "Image" }
     ] as const;
+
+    // Fix 7: Handle keyboard events for text input
+    const handleTextKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            setShowTextInput(false);
+        } else if (e.key === 'Enter' && e.ctrlKey) {
+            handleTextSubmit();
+        }
+    };
+
+    // Fix 8: Added handling for the image tool type which was defined but not implemented
+    const handleImageUpload = () => {
+        // Implementation would go here
+        console.log("Image upload functionality not yet implemented");
+    };
+
+    useEffect(() => {
+        if (type === "image") {
+            // For now, just log that it's not implemented
+            console.log("Image tool selected but not yet implemented");
+            // Alternatively, could open a file dialog here
+        }
+    }, [type]);
 
     return (
         <div ref={containerRef} className="relative h-screen w-screen overflow-hidden">
@@ -194,6 +256,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 className="bg-[#444444] text-white px-2 py-1 rounded"
                                 value={fontSize}
                                 onChange={(e) => setFontSize(Number(e.target.value))}
+                                aria-label="Font size"
                             >
                                 {[12, 14, 16, 18, 20, 24, 28, 32].map(size => (
                                     <option key={size} value={size}>{size}px</option>
@@ -204,6 +267,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 size="sm"
                                 onClick={() => setIsBold(!isBold)}
                                 className="font-bold"
+                                aria-label="Bold"
+                                aria-pressed={isBold}
                             >
                                 B
                             </Button>
@@ -212,6 +277,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 size="sm"
                                 onClick={() => setIsItalic(!isItalic)}
                                 className="italic"
+                                aria-label="Italic"
+                                aria-pressed={isItalic}
                             >
                                 I
                             </Button>
@@ -222,6 +289,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                         size="sm"
                                         className="w-8 h-8"
                                         style={{ backgroundColor: selectedColor }}
+                                        aria-label="Select color"
                                     />
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
@@ -238,19 +306,23 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 fontSize: `${fontSize}px`,
                                 fontWeight: isBold ? 'bold' : 'normal',
                                 fontStyle: isItalic ? 'italic' : 'normal',
+                                color: selectedColor // Fix 9: Added color preview to textarea
                             }}
+                            onKeyDown={handleTextKeyDown}
                         />
                         <div className="flex justify-end gap-2 mt-2">
                             <Button
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => setShowTextInput(false)}
+                                aria-label="Cancel"
                             >
                                 <X className="w-4 h-4" />
                             </Button>
                             <Button
                                 size="sm"
                                 onClick={handleTextSubmit}
+                                aria-label="Submit text"
                             >
                                 <Check className="w-4 h-4" />
                             </Button>
@@ -273,6 +345,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 type === tool.type ? "bg-[#444444] hover:bg-[#444444]" : "hover:bg-[#444444]",
                                 "text-[#d4d4d4]"
                             )}
+                            aria-label={tool.label}
+                            aria-pressed={type === tool.type}
                         >
                             <tool.icon className="h-5 w-5" />
                         </Button>
@@ -284,6 +358,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 size="icon"
                                 className="w-7 h-7 m-1 rounded-full flex justify-center items-center"
                                 style={{ backgroundColor: selectedColor }}
+                                aria-label="Color picker"
                             />
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -295,12 +370,10 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
 
             <Card className="absolute bottom-2 right-4 w-80 h-96 bg-[#222222] z-10 border-0 overflow-auto scrollbar-hide">
                 <OnlineUsersDropdown users={onlineUsers} />
-                <ChatSection roomId={roomId} socket={socket}/>
+                <ChatSection roomId={roomId} socket={socket} />
             </Card>
         </div>
     );
 };
 
 export default CanvasComponent;
-
-

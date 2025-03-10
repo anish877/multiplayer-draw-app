@@ -15,7 +15,7 @@ type Shape = {
     width: number;
     height: number;
     color?: string;
-    id?: string; // Add unique ID for each shape
+    id?: string;
 } | {
     type: "circle";
     startx: number;
@@ -23,12 +23,12 @@ type Shape = {
     clientx: number;
     clienty: number;
     color?: string;
-    id?: string; // Add unique ID for each shape
+    id?: string;
 } | {
     type: "pencil";
     points: Point[];
     color?: string;
-    id?: string; // Add unique ID for each shape
+    id?: string;
 } | {
     type: "text";
     x: number;
@@ -56,7 +56,7 @@ const CHALK_COLORS = [
 
 // Generate a simple unique ID
 function generateId(): string {
-    return Math.random().toString(36).substr(2, 9);
+    return Math.random().toString(36).substring(2, 9);
 }
 
 // Check if point is inside rectangle
@@ -99,17 +99,41 @@ function isPointInPencil(x: number, y: number, pencil: Extract<Shape, {type: "pe
 
 // Check if point is inside text
 function isPointInText(x: number, y: number, text: Extract<Shape, {type: "text"}>): boolean {
-    // Approximate text area (could be improved with actual text measurements)
-    const lineHeight = 20;
+    // Approximate text area based on content and font size
+    const style = text.style || { fontSize: 16, isBold: false, isItalic: false };
+    const lineHeight = style.fontSize * 1.2;
     const lines = text.content.split('\n');
     const height = lines.length * lineHeight;
-    const width = Math.max(...lines.map(line => line.length * 10)); // rough estimate
+    const width = Math.max(...lines.map(line => line.length * (style.fontSize * 0.6))); // better estimate
     
     return x >= text.x && x <= text.x + width && 
            y >= text.y && y <= text.y + height;
 }
 
-export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, type: string, selectedColor: string = CHALK_COLORS[0]): Promise<() => void> {
+// Helper function to check if point is inside any shape
+function isPointInShape(x: number, y: number, shape: Shape): boolean {
+    switch (shape.type) {
+        case "rect":
+            return isPointInRect(x, y, shape);
+        case "circle":
+            return isPointInCircle(x, y, shape);
+        case "pencil":
+            return isPointInPencil(x, y, shape);
+        case "text":
+            return isPointInText(x, y, shape);
+        default:
+            return false;
+    }
+}
+
+export async function initDraw(
+    canvas: HTMLCanvasElement, 
+    roomId: string, 
+    socket: WebSocket, 
+    userId: string, 
+    type: string, 
+    selectedColor: string = CHALK_COLORS[0]
+): Promise<() => void> {
     let isDrawing = false;
     let isDragging = false;
     let currentShape: Shape | null = null;
@@ -117,7 +141,8 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
     let oldSelectedShape: Shape | null = null; // Store original state for deletion
     let dragOffsetX = 0;
     let dragOffsetY = 0;
-    let ctx = canvas.getContext("2d");
+    
+    const ctx = canvas.getContext("2d");
     if (!ctx) return () => {}; // Return empty cleanup function if no context
 
     // Initialize RoughJS
@@ -134,33 +159,38 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
 
     // Store message handler reference so we can remove it later
     const handleSocketMessage = (e: MessageEvent) => {
-        const message = JSON.parse(e.data);
-        if (message.type === "chat") {
-            const parsedShape = JSON.parse(message.message);
+        try {
+            const message = JSON.parse(e.data);
             
-            // Check if this is an update to an existing shape
-            const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
-            if (existingIndex >= 0) {
-                existingShapes[existingIndex] = parsedShape;
-            } else {
-                existingShapes.push(parsedShape);
-            }
-            
-            clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
-        } else if (message.type === "delete_chat") {
-            try {
-                const deletedShape = JSON.parse(message.message);
-                existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
+            if (message.type === "chat") {
+                const parsedShape = JSON.parse(message.message);
                 
-                // If the deleted shape was selected, deselect it
-                if (selectedShape && selectedShape.id === deletedShape.id) {
-                    selectedShape = null;
+                // Check if this is an update to an existing shape
+                const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
+                if (existingIndex >= 0) {
+                    existingShapes[existingIndex] = parsedShape;
+                } else {
+                    existingShapes.push(parsedShape);
                 }
                 
                 clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
-            } catch (err) {
-                console.error("Error parsing deleted shape:", err);
+            } else if (message.type === "delete_chat") {
+                try {
+                    const deletedShape = JSON.parse(message.message);
+                    existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
+                    
+                    // If the deleted shape was selected, deselect it
+                    if (selectedShape && selectedShape.id === deletedShape.id) {
+                        selectedShape = null;
+                    }
+                    
+                    clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
+                } catch (err) {
+                    console.error("Error parsing deleted shape:", err);
+                }
             }
+        } catch (err) {
+            console.error("Error processing message:", err);
         }
     };
 
@@ -257,6 +287,37 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                     id: generateId()
                 };
                 break;
+            case "text":
+                currentShape = {
+                    type: "text",
+                    x,
+                    y,
+                    content: "",
+                    color: selectedColor,
+                    id: generateId(),
+                    style: {
+                        fontSize: 16,
+                        isBold: false,
+                        isItalic: false
+                    }
+                };
+                
+                // Show a prompt to enter text
+                const textContent = prompt("Enter text:", "");
+                if (textContent !== null) {
+                    currentShape.content = textContent;
+                    existingShapes.push(currentShape);
+                    
+                    socket.send(JSON.stringify({
+                        type: "chat",
+                        message: JSON.stringify(currentShape),
+                        roomId,
+                        userId
+                    }));
+                }
+                currentShape = null;
+                isDrawing = false;
+                break;
         }
     };
 
@@ -326,6 +387,11 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
         if (isDragging && selectedShape && oldSelectedShape && type === "select") {
             isDragging = false;
             
+            // Don't send updates if nothing changed
+            if (JSON.stringify(selectedShape) === JSON.stringify(oldSelectedShape)) {
+                return;
+            }
+            
             // Delete old shape position first
             socket.send(JSON.stringify({
                 type: "delete_chat",
@@ -346,7 +412,29 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
             return;
         }
         
-        if (!currentShape || !isDrawing || currentShape.type !== type) return;
+        if (!currentShape || !isDrawing) return;
+        
+        // Ensure we're only saving shapes with actual content
+        if (currentShape.type === "pencil" && currentShape.points.length <= 1) {
+            isDrawing = false;
+            currentShape = null;
+            return;
+        }
+        
+        if (currentShape.type === "rect" && 
+           (Math.abs(currentShape.width) < 3 || Math.abs(currentShape.height) < 3)) {
+            isDrawing = false;
+            currentShape = null;
+            return;
+        }
+        
+        if (currentShape.type === "circle" && 
+           (Math.abs(currentShape.clientx - currentShape.startx) < 3 || 
+            Math.abs(currentShape.clienty - currentShape.starty) < 3)) {
+            isDrawing = false;
+            currentShape = null;
+            return;
+        }
         
         isDrawing = false;
         existingShapes.push(currentShape);
@@ -362,9 +450,13 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
     };
 
     const handleMouseLeave = () => {
+        // If we're in the middle of drawing, finish the shape
+        if (isDrawing && currentShape) {
+            handleMouseUp();
+        }
+        
         isDrawing = false;
         isDragging = false;
-        currentShape = null;
     };
     
     // Add event listeners
@@ -375,7 +467,7 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
     
     // Add event listener for delete key
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Delete" && selectedShape) {
+        if ((e.key === "Delete" || e.key === "Backspace") && selectedShape) {
             // Remove from existing shapes
             existingShapes = existingShapes.filter(s => s.id !== selectedShape?.id);
             
@@ -391,26 +483,15 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
             selectedShape = null;
             oldSelectedShape = null;
             clearCanvas(existingShapes, canvas, ctx, roughCanvas, null);
+            
+            // Prevent default behavior (page navigation on backspace)
+            if (e.key === "Backspace") {
+                e.preventDefault();
+            }
         }
     };
     
     document.addEventListener("keydown", handleKeyDown);
-    
-    // Helper function to check if point is inside any shape
-    function isPointInShape(x: number, y: number, shape: Shape): boolean {
-        switch (shape.type) {
-            case "rect":
-                return isPointInRect(x, y, shape);
-            case "circle":
-                return isPointInCircle(x, y, shape);
-            case "pencil":
-                return isPointInPencil(x, y, shape);
-            case "text":
-                return isPointInText(x, y, shape);
-            default:
-                return false;
-        }
-    }
     
     // Return the cleanup function
     return () => {
@@ -494,10 +575,11 @@ function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
             maxY - minY + 10
         );
     } else if (shape.type === "text") {
-        const lineHeight = 20;
+        const style = shape.style || { fontSize: 16, isBold: false, isItalic: false };
+        const lineHeight = style.fontSize * 1.2;
         const lines = shape.content.split('\n');
         const height = lines.length * lineHeight;
-        const width = Math.max(...lines.map(line => line.length * 10)); // rough estimate
+        const width = Math.max(...lines.map(line => line.length * (style.fontSize * 0.6)));
         
         ctx.strokeRect(
             shape.x - 5,
@@ -511,21 +593,39 @@ function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
 }
 
 async function getExistingShapes(roomId: string): Promise<Shape[]> {
-    const response = await axios.get(`${BACKEND_URL}/chats/${roomId}`);
-    const messages = response.data.messages;
-    return messages.map((x: {message: string}) => {
-        try {
-            const shape = JSON.parse(x.message);
-            // Ensure each shape has an ID
-            if (!shape.id) {
-                shape.id = generateId();
-            }
-            return shape;
-        } catch (err) {
-            console.error("Error parsing shape:", err);
-            return null;
+    try {
+        const response = await axios.get(`${BACKEND_URL}/chats/${roomId}`);
+        const messages = response.data.messages;
+        
+        if (!Array.isArray(messages)) {
+            console.error("Expected messages to be an array:", messages);
+            return [];
         }
-    }).filter((shape: Shape | null) => shape !== null);
+        
+        return messages
+            .filter((x: any) => x && typeof x.message === 'string')
+            .map((x: {message: string}) => {
+                try {
+                    const shape = JSON.parse(x.message);
+                    // Ensure each shape has an ID
+                    if (!shape.id) {
+                        shape.id = generateId();
+                    }
+                    // Validate shape type
+                    if (!['rect', 'circle', 'pencil', 'text'].includes(shape.type)) {
+                        return null;
+                    }
+                    return shape;
+                } catch (err) {
+                    console.error("Error parsing shape:", err);
+                    return null;
+                }
+            })
+            .filter((shape: Shape | null) => shape !== null);
+    } catch (err) {
+        console.error("Error fetching existing shapes:", err);
+        return [];
+    }
 }
 
 function drawShape(shape: Shape, ctx: CanvasRenderingContext2D, roughCanvas: RoughCanvas) {
@@ -554,13 +654,13 @@ function drawShape(shape: Shape, ctx: CanvasRenderingContext2D, roughCanvas: Rou
 }
 
 function drawRectangle(shape: Extract<Shape, {type: "rect"}>, roughCanvas: RoughCanvas, options: any) {
-    roughCanvas.rectangle(
-        shape.x,
-        shape.y,
-        shape.width,
-        shape.height,
-        options
-    );
+    // Ensure width and height are positive (for proper rendering)
+    const x = shape.width < 0 ? shape.x + shape.width : shape.x;
+    const y = shape.height < 0 ? shape.y + shape.height : shape.y;
+    const width = Math.abs(shape.width);
+    const height = Math.abs(shape.height);
+    
+    roughCanvas.rectangle(x, y, width, height, options);
 }
 
 function drawEllipse(shape: Extract<Shape, {type: "circle"}>, roughCanvas: RoughCanvas, options: any) {
@@ -611,6 +711,8 @@ function drawPencil(shape: Extract<Shape, {type: "pencil"}>, ctx: CanvasRenderin
 }
 
 function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingContext2D) {
+    if (!shape.content) return;
+    
     ctx.save();
     
     // Apply text styles
@@ -632,7 +734,6 @@ function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingCon
     
     ctx.restore();
 }
-
 
 export default {
     initDraw,
