@@ -155,7 +155,7 @@ export async function initDraw(
     ctx.font = '16px sans-serif';
     
     let existingShapes: Shape[] = await getExistingShapes(roomId);
-    clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
+    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
 
     // Store message handler reference so we can remove it later
     const handleSocketMessage = (e: MessageEvent) => {
@@ -173,7 +173,7 @@ export async function initDraw(
                     existingShapes.push(parsedShape);
                 }
                 
-                clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
+                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
             } else if (message.type === "delete_chat") {
                 try {
                     const deletedShape = JSON.parse(message.message);
@@ -184,7 +184,7 @@ export async function initDraw(
                         selectedShape = null;
                     }
                     
-                    clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
+                    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
                 } catch (err) {
                     console.error("Error parsing deleted shape:", err);
                 }
@@ -238,7 +238,7 @@ export async function initDraw(
                         dragOffsetY = y - shape.y;
                     }
                     
-                    clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
+                    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
                     break;
                 }
             }
@@ -246,7 +246,7 @@ export async function initDraw(
             if (!found) {
                 selectedShape = null;
                 oldSelectedShape = null;
-                clearCanvas(existingShapes, canvas, ctx, roughCanvas, null);
+                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
             }
             return;
         }
@@ -319,6 +319,11 @@ export async function initDraw(
                 isDrawing = false;
                 break;
         }
+        
+        // Draw the initial state of the current shape
+        if (currentShape) {
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
+        }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -358,7 +363,7 @@ export async function initDraw(
                 selectedShape.y = y - dragOffsetY;
             }
             
-            clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
             return;
         }
         
@@ -378,8 +383,7 @@ export async function initDraw(
                 break;
         }
     
-        clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
-        drawShape(currentShape, ctx, roughCanvas);
+        clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
     };
     
     const handleMouseUp = () => {
@@ -418,6 +422,7 @@ export async function initDraw(
         if (currentShape.type === "pencil" && currentShape.points.length <= 1) {
             isDrawing = false;
             currentShape = null;
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, null);
             return;
         }
         
@@ -425,6 +430,7 @@ export async function initDraw(
            (Math.abs(currentShape.width) < 3 || Math.abs(currentShape.height) < 3)) {
             isDrawing = false;
             currentShape = null;
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, null);
             return;
         }
         
@@ -433,6 +439,7 @@ export async function initDraw(
             Math.abs(currentShape.clienty - currentShape.starty) < 3)) {
             isDrawing = false;
             currentShape = null;
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, null);
             return;
         }
         
@@ -446,7 +453,9 @@ export async function initDraw(
             userId
         }));
         
+        const completedShape = currentShape;
         currentShape = null;
+        clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, null);
     };
 
     const handleMouseLeave = () => {
@@ -482,7 +491,7 @@ export async function initDraw(
             // Clear selection and redraw
             selectedShape = null;
             oldSelectedShape = null;
-            clearCanvas(existingShapes, canvas, ctx, roughCanvas, null);
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
             
             // Prevent default behavior (page navigation on backspace)
             if (e.key === "Backspace") {
@@ -504,6 +513,37 @@ export async function initDraw(
     };
 }
 
+// New function that handles both existing shapes and the current shape being drawn
+export function clearCanvasAndDrawAll(
+    existingShapes: Shape[], 
+    canvas: HTMLCanvasElement, 
+    ctx: CanvasRenderingContext2D, 
+    roughCanvas: RoughCanvas,
+    selectedShape: Shape | null,
+    currentShape: Shape | null
+) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw all existing shapes
+    existingShapes.forEach(shape => {
+        // Skip selected shape - we'll draw it last
+        if (selectedShape && shape.id === selectedShape.id) return;
+        drawShape(shape, ctx, roughCanvas);
+    });
+    
+    // Draw the current shape being created (if any)
+    if (currentShape) {
+        drawShape(currentShape, ctx, roughCanvas);
+    }
+    
+    // Draw selected shape last (so it appears on top with selection indicator)
+    if (selectedShape) {
+        drawSelectionIndicator(selectedShape, ctx);
+        drawShape(selectedShape, ctx, roughCanvas);
+    }
+}
+
+// Keep the original clearCanvas for compatibility
 export function clearCanvas(
     existingShapes: Shape[], 
     canvas: HTMLCanvasElement, 
@@ -511,21 +551,7 @@ export function clearCanvas(
     roughCanvas: RoughCanvas,
     selectedShape: Shape | null
 ) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw all shapes
-    existingShapes.forEach(shape => {
-        // Skip selected shape - we'll draw it last
-        if (selectedShape && shape.id === selectedShape.id) return;
-        drawShape(shape, ctx, roughCanvas);
-    });
-    
-    // Draw selected shape last (so it appears on top)
-    if (selectedShape) {
-        // Draw selection indicator
-        drawSelectionIndicator(selectedShape, ctx);
-        drawShape(selectedShape, ctx, roughCanvas);
-    }
+    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, null);
 }
 
 function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
@@ -738,5 +764,6 @@ function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingCon
 export default {
     initDraw,
     clearCanvas,
+    clearCanvasAndDrawAll,
     CHALK_COLORS,
 };

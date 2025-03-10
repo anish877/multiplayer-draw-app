@@ -30,10 +30,12 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const textInputRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const cleanupFunctionRef = useRef<(() => void) | null>(null);
     const [type, setType] = useState<ToolType>("select");
     const [showTextInput, setShowTextInput] = useState(false);
     const [textPosition, setTextPosition] = useState({ x: 0, y: 0 });
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
     const [selectedColor, setSelectedColor] = useState(CHALK_COLORS[0]);
     const [fontSize, setFontSize] = useState(16);
     const [isBold, setIsBold] = useState(false);
@@ -41,7 +43,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const { userId } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Array<{ name: string; userId: string }>>([]);
 
-    // Fix 1: Added a dependency array to useEffect for socket event listener
+    // Socket event listener
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             try {
@@ -88,42 +90,49 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, []);
 
-    // Fix 2: Separate text input handling from drawing initialization
+    // Handle text and image tool clicks
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         
-        let cleanupTextListener: (() => void) | null = null;
+        let cleanupListener: (() => void) | null = null;
         
         const handleCanvasClick = (e: MouseEvent) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickPosition = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            
             if (type === "text") {
-                const rect = canvas.getBoundingClientRect();
-                setTextPosition({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                });
+                setTextPosition(clickPosition);
                 setShowTextInput(true);
                 setTimeout(() => {
                     if (textInputRef.current) {
                         textInputRef.current.focus();
                     }
                 }, 0);
+            } else if (type === "image") {
+                setImagePosition(clickPosition);
+                if (fileInputRef.current) {
+                    fileInputRef.current.click();
+                }
             }
         };
 
-        if (type === "text") {
+        if (type === "text" || type === "image") {
             canvas.addEventListener("click", handleCanvasClick);
-            cleanupTextListener = () => {
+            cleanupListener = () => {
                 canvas.removeEventListener("click", handleCanvasClick);
             };
         }
         
         return () => {
-            if (cleanupTextListener) cleanupTextListener();
+            if (cleanupListener) cleanupListener();
         };
     }, [type]);
     
-    // Fix 3: Separate drawing initialization to its own effect
+    // Drawing initialization
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -162,10 +171,9 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             isItalic,
         };
 
-        // Fix 4: Added error handling for socket messaging
         try {
             socket.send(JSON.stringify({
-                type: "text_element", // Fix 5: Changed message type for clarity
+                type: "text_element",
                 message: JSON.stringify({
                     type: "text",
                     x: textPosition.x,
@@ -186,7 +194,57 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
     };
 
-    // Fix 6: Extracted ColorPicker as a separate component
+    // Handle image file selection
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        
+        const file = e.target.files[0];
+        if (!file.type.startsWith('image/')) {
+            console.error('Selected file is not an image');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            if (!event.target || typeof event.target.result !== 'string') return;
+            
+            const imageData = event.target.result;
+            
+            // Create an image element to get dimensions
+            const img = new Image();
+            img.onload = () => {
+                // Send image data to other users
+                try {
+                    socket.send(JSON.stringify({
+                        type: "image_element",
+                        message: JSON.stringify({
+                            type: "image",
+                            x: imagePosition.x,
+                            y: imagePosition.y,
+                            width: img.width,
+                            height: img.height,
+                            src: imageData,
+                            id: Math.random().toString(36).substr(2, 9)
+                        }),
+                        roomId,
+                        userId
+                    }));
+                } catch (error) {
+                    console.error("Error sending image message:", error);
+                }
+            };
+            img.src = imageData;
+        };
+        
+        reader.readAsDataURL(file);
+        
+        // Reset file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    // Color picker component
     const ColorPicker = () => (
         <div className="grid grid-cols-6 gap-2 p-2">
             {CHALK_COLORS.map((color) => (
@@ -213,7 +271,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         { type: "image", icon: FileImage, label: "Image" }
     ] as const;
 
-    // Fix 7: Handle keyboard events for text input
+    // Handle keyboard events for text input
     const handleTextKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
             setShowTextInput(false);
@@ -222,25 +280,21 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
     };
 
-    // Fix 8: Added handling for the image tool type which was defined but not implemented
-    const handleImageUpload = () => {
-        // Implementation would go here
-        console.log("Image upload functionality not yet implemented");
-    };
-
-    useEffect(() => {
-        if (type === "image") {
-            // For now, just log that it's not implemented
-            console.log("Image tool selected but not yet implemented");
-            // Alternatively, could open a file dialog here
-        }
-    }, [type]);
-
     return (
         <div ref={containerRef} className="relative h-screen w-screen overflow-hidden">
             <canvas 
                 ref={canvasRef} 
                 className="absolute top-0 left-0 w-full h-full bg-[#222222]"
+            />
+            
+            {/* Hidden file input for image uploads */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageUpload}
+                aria-label="Upload image"
             />
 
             {/* Text input overlay with formatting controls */}
@@ -306,7 +360,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                                 fontSize: `${fontSize}px`,
                                 fontWeight: isBold ? 'bold' : 'normal',
                                 fontStyle: isItalic ? 'italic' : 'normal',
-                                color: selectedColor // Fix 9: Added color preview to textarea
+                                color: selectedColor
                             }}
                             onKeyDown={handleTextKeyDown}
                         />
