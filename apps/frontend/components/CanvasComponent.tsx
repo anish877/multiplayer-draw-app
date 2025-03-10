@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Circle, Square, Pencil, MousePointer, FileImage, Type, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import OnlineUsersDropdown from './OnlineUsersComponent';
 
 type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text";
 
@@ -38,6 +39,16 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const [isBold, setIsBold] = useState(false);
     const [isItalic, setIsItalic] = useState(false);
     const { userId } = useAuth();
+    const [onlineUsers, setOnlineUsers] = useState<Array<{ name: string; userId: string }>>([]);
+
+    useEffect(() => {
+        socket.addEventListener('message', (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'users_update') {
+                setOnlineUsers(data.users);
+            }
+        });
+    }, [socket]);
 
     // Handle canvas resize
     useEffect(() => {
@@ -283,6 +294,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             </Card>
 
             <Card className="absolute bottom-2 right-4 w-80 h-96 bg-[#222222] z-10 border-0 overflow-auto scrollbar-hide">
+                <OnlineUsersDropdown users={onlineUsers} />
                 <ChatSection roomId={roomId} socket={socket}/>
             </Card>
         </div>

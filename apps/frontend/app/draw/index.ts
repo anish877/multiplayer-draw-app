@@ -172,8 +172,8 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
-        // Check if we're clicking on an existing shape
+    
+        // Check if we're clicking on an existing shape, but only in select mode
         if (type === "select") {
             let found = false;
             // Iterate in reverse to select the topmost shape first
@@ -196,7 +196,6 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                         dragOffsetX = x - centerX;
                         dragOffsetY = y - centerY;
                     } else if (shape.type === "pencil") {
-                        // Find bounding box center for pencil
                         let minX = Infinity, minY = Infinity;
                         shape.points.forEach(point => {
                             minX = Math.min(minX, point.x);
@@ -209,7 +208,6 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                         dragOffsetY = y - shape.y;
                     }
                     
-                    // Redraw with selected shape
                     clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
                     break;
                 }
@@ -225,6 +223,8 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
         
         // If not in select mode, start drawing
         isDrawing = true;
+        selectedShape = null; // Clear any selection when starting to draw
+        oldSelectedShape = null;
         
         switch (type) {
             case "pencil":
@@ -257,9 +257,6 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                     id: generateId()
                 };
                 break;
-            case "text":
-                // Text handling is done in the React component
-                break;
         }
     };
 
@@ -267,8 +264,9 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
-        if (isDragging && selectedShape) {
+    
+        // Only allow dragging in select mode
+        if (isDragging && selectedShape && type === "select") {
             // Move the selected shape
             if (selectedShape.type === "rect") {
                 selectedShape.x = x - dragOffsetX;
@@ -281,18 +279,15 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                 selectedShape.clientx = selectedShape.startx + dx;
                 selectedShape.clienty = selectedShape.starty + dy;
             } else if (selectedShape.type === "pencil") {
-                // Find current bounding box for pencil
                 let minX = Infinity, minY = Infinity;
                 selectedShape.points.forEach(point => {
                     minX = Math.min(minX, point.x);
                     minY = Math.min(minY, point.y);
                 });
                 
-                // Calculate translation
                 const dx = (x - dragOffsetX) - minX;
                 const dy = (y - dragOffsetY) - minY;
                 
-                // Move all points
                 selectedShape.points = selectedShape.points.map(point => ({
                     x: point.x + dx,
                     y: point.y + dy
@@ -307,7 +302,7 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
         }
         
         if (!isDrawing || !ctx || !currentShape) return;
-
+    
         switch (currentShape.type) {
             case "pencil":
                 currentShape.points.push({x, y});
@@ -321,13 +316,14 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                 currentShape.clienty = y;
                 break;
         }
-
+    
         clearCanvas(existingShapes, canvas, ctx, roughCanvas, selectedShape);
         drawShape(currentShape, ctx, roughCanvas);
     };
-
+    
     const handleMouseUp = () => {
-        if (isDragging && selectedShape && oldSelectedShape) {
+        // Only handle shape movement in select mode
+        if (isDragging && selectedShape && oldSelectedShape && type === "select") {
             isDragging = false;
             
             // Delete old shape position first
@@ -346,7 +342,6 @@ export async function initDraw(canvas: HTMLCanvasElement, roomId: string, socket
                 userId
             }));
             
-            // Update the oldSelectedShape to match current position
             oldSelectedShape = JSON.parse(JSON.stringify(selectedShape));
             return;
         }

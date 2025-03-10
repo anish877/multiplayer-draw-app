@@ -7,7 +7,8 @@ import { prismaClient } from "db/config"
 interface Users {
     rooms: String[],
     userId: String,
-    ws: WebSocket
+    ws: WebSocket,
+    name: string
 }
 
 const users : Users[] = []
@@ -26,21 +27,40 @@ wss.on("connection",(ws,request)=>{
     users.push({
         rooms: [],
         userId: decoded.id,
-        ws: ws
+        ws: ws,
+        name: decoded.name
     })
+    const broadcastUsers = (roomId: String) => {
+        const roomUsers = users
+            .filter(user => user.rooms.includes(roomId))
+            .map(user => ({
+                userId: user.userId,
+                name: user.name // You'll need to store user names when they connect
+            }));
+        
+        users.forEach(user => {
+            if (user.rooms.includes(roomId)) {
+                user.ws.send(JSON.stringify({
+                    type: "users_update",
+                    users: roomUsers
+                }));
+            }
+        });
+    };
     ws.on("error",(error)=>console.log(error))
     ws.on("message",async (data : string)=>{
         const parsedData = await JSON.parse(data)
         console.log(parsedData)
-        if(parsedData.type==="join_room"){
-            const user = users.find(user=>user.ws===ws)
-            user?.rooms.push(parsedData.roomId)
+        if (parsedData.type === "join_room") {
+            const user = users.find(user => user.ws === ws);
+            user?.rooms.push(parsedData.roomId);
+            broadcastUsers(parsedData.roomId);
         }
-        else if(parsedData.type==="leave_room"){
-            const user = users.find(user=>user.ws===ws)
-            if(!user)
-                return
-            user.rooms = user?.rooms.filter(room=>room!==parsedData.roomId)
+        else if (parsedData.type === "leave_room") {
+            const user = users.find(user => user.ws === ws);
+            if (!user) return;
+            user.rooms = user.rooms.filter(room => room !== parsedData.roomId);
+            broadcastUsers(parsedData.roomId);
         }
         else if(parsedData.type==="chat"){
             users.forEach(user=>{
@@ -91,4 +111,17 @@ wss.on("connection",(ws,request)=>{
         }
         console.log(users)
     })
+
+    ws.on("close", () => {
+        const userIndex = users.findIndex(user => user.ws === ws);
+        if (userIndex === -1) return;
+        if(!users[userIndex]) return
+        const userRooms = [...users[userIndex].rooms];
+        users.splice(userIndex, 1);
+        
+        // Broadcast updated user list to all rooms the user was in
+        userRooms.forEach(roomId => {
+            broadcastUsers(roomId);
+        });
+    });
 })
