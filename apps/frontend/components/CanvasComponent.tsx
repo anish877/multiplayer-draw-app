@@ -551,9 +551,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 {/* Chat toggle button */}
                 <Button
                     variant="secondary"
-                    size="sm"
                     onClick={toggleChat}
-                    className="absolute bottom-2 right-4 z-20 bg-[#333333] hover:bg-[#444444] text-white"
+                    className="absolute bottom-2 right-4 z-20 bg-[#333333] hover:bg-[#444444] text-white m-5 mr-0 font-sans"
                     aria-label={isChatVisible ? "Hide chat" : "Show chat"}
                 >
                     {isChatVisible ? (
@@ -573,8 +572,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
 
                 {/* Chat section - with toggle functionality and normal text style */}
                 {isChatVisible && (
-                    <Card className="absolute bottom-10 right-4 w-80 h-96 bg-[#1a1a1a] z-10 border border-[#555555] rounded-md overflow-hidden">
-                        <CardContent className="p-0 h-full font-normal">
+                    <Card className="absolute bottom-10 right-4 w-80 h-96 bg-[#1a1a1a] z-10 border border-[#555555] rounded-md overflow-hidden mb-8">
+                        <CardContent className="p-0 h-full font-sans">
                             <div className="w-full h-full">
                                 <ChatSection roomId={roomId} socket={socket} />
                             </div>

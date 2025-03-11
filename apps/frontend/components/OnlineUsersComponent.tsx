@@ -14,7 +14,7 @@ import {
 const OnlineUsersDropdown = ({ users }: { users: { name: string; userId: string }[] }) => {
     console.log(users)
   return (
-    <Card className="absolute top-4 right-4 bg-[#272727] border-[#3d3d3d] z-10">
+    <Card className="absolute top-4 right-4 bg-[#272727] border-[#3d3d3d] z-10 font-sans">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
