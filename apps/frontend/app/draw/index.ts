@@ -56,7 +56,7 @@ const CHALK_COLORS = [
 
 // Generate a simple unique ID
 function generateId(): string {
-    return Math.random().toString(36).substring(2, 9);
+    return Math.random().toString(36).substring(2, 9)+Date.now().toString;
 }
 
 // Check if point is inside rectangle

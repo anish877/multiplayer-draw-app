@@ -11,6 +11,7 @@ import OnlineUsersDropdown from './OnlineUsersComponent';
 
 type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text";
 
+// Consistent colors array
 const CHALK_COLORS = [
     '#ffffff', // white
     '#f5c431', // yellow
@@ -42,9 +43,12 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const [isItalic, setIsItalic] = useState(false);
     const { userId } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Array<{ name: string; userId: string }>>([]);
+    const [canvasInitialized, setCanvasInitialized] = useState(false);
 
     // Socket event listener
     useEffect(() => {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
         const handleMessage = (event: MessageEvent) => {
             try {
                 const data = JSON.parse(event.data);
@@ -63,39 +67,65 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [socket]);
 
-    // Handle canvas resize
+    // Handle canvas resize with proper debouncing
     useEffect(() => {
         if (!canvasRef.current || !containerRef.current) return;
         
         const handleResize = () => {
             if (!canvasRef.current || !containerRef.current) return;
             
+            // Store the current canvas content
+            const canvas = canvasRef.current;
+            const context = canvas.getContext('2d');
+            let imageData = null;
+            
+            if (context && canvasInitialized) {
+                imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            }
+            
             // Get container dimensions
             const container = containerRef.current;
             const rect = container.getBoundingClientRect();
             
             // Set canvas size to match container
-            canvasRef.current.width = rect.width;
-            canvasRef.current.height = rect.height;
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            // Restore the canvas content if we saved it
+            if (imageData && context) {
+                context.putImageData(imageData, 0, 0);
+            }
+            
+            setCanvasInitialized(true);
+        };
+
+        // Create a debounced version of handleResize
+        let resizeTimeout: NodeJS.Timeout | null = null;
+        const debouncedResize = () => {
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
+            }
+            resizeTimeout = setTimeout(handleResize, 250);
         };
 
         // Initial resize
         handleResize();
 
-        // Listen for window resize
-        window.addEventListener('resize', handleResize);
+        // Listen for window resize with debounce
+        window.addEventListener('resize', debouncedResize);
         
         return () => {
-            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('resize', debouncedResize);
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
+            }
         };
-    }, []);
+    }, [canvasInitialized]);
 
     // Handle text and image tool clicks
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        
-        let cleanupListener: (() => void) | null = null;
         
         const handleCanvasClick = (e: MouseEvent) => {
             const rect = canvas.getBoundingClientRect();
@@ -122,22 +152,21 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
 
         if (type === "text" || type === "image") {
             canvas.addEventListener("click", handleCanvasClick);
-            cleanupListener = () => {
+            return () => {
                 canvas.removeEventListener("click", handleCanvasClick);
             };
         }
         
-        return () => {
-            if (cleanupListener) cleanupListener();
-        };
+        return undefined;
     }, [type]);
     
-    // Drawing initialization
+    // Drawing initialization - with prevention of multiple initializations
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas || !socket || socket.readyState !== WebSocket.OPEN) return;
         
         const setupCanvas = async () => {
+            // Clean up previous drawing instance if it exists
             if (cleanupFunctionRef.current) {
                 cleanupFunctionRef.current();
                 cleanupFunctionRef.current = null;
@@ -151,9 +180,13 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             }
         };
         
-        setupCanvas();
+        // Delay setup to ensure canvas is ready
+        const timeoutId = setTimeout(() => {
+            setupCanvas();
+        }, 100);
 
         return () => {
+            clearTimeout(timeoutId);
             if (cleanupFunctionRef.current) {
                 cleanupFunctionRef.current();
                 cleanupFunctionRef.current = null;
@@ -161,8 +194,39 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [roomId, socket, userId, type, selectedColor]);
 
+    // Handle window focus/blur events to prevent drawing issues when switching tabs
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // Page is hidden (blur), clean up drawing
+                if (cleanupFunctionRef.current) {
+                    cleanupFunctionRef.current();
+                    cleanupFunctionRef.current = null;
+                }
+            } else {
+                // Page is visible again (focus), reinitialize drawing
+                const canvas = canvasRef.current;
+                if (canvas && socket && socket.readyState === WebSocket.OPEN) {
+                    initDraw(canvas, roomId, socket, userId, type, selectedColor)
+                        .then(cleanup => {
+                            cleanupFunctionRef.current = cleanup;
+                        })
+                        .catch(error => {
+                            console.error("Error reinitializing drawing:", error);
+                        });
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [roomId, socket, userId, type, selectedColor]);
+
     const handleTextSubmit = () => {
-        if (!textInputRef.current?.value.trim()) return;
+        if (!textInputRef.current?.value.trim() || !socket || socket.readyState !== WebSocket.OPEN) return;
         
         const textContent = textInputRef.current.value;
         const textStyle = {
@@ -194,13 +258,22 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
     };
 
-    // Handle image file selection
+    // Handle image file selection with size validation
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return;
+        if (!e.target.files || e.target.files.length === 0 || !socket || socket.readyState !== WebSocket.OPEN) return;
         
         const file = e.target.files[0];
         if (!file.type.startsWith('image/')) {
             console.error('Selected file is not an image');
+            return;
+        }
+
+        // Check file size (limit to 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Image size too large. Please select an image under 5MB.');
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
             return;
         }
 
@@ -213,6 +286,24 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             // Create an image element to get dimensions
             const img = new Image();
             img.onload = () => {
+                // Calculate scaled dimensions to prevent oversized images
+                const maxWidth = 800;
+                const maxHeight = 600;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    const ratio = maxWidth / width;
+                    width = maxWidth;
+                    height = height * ratio;
+                }
+
+                if (height > maxHeight) {
+                    const ratio = maxHeight / height;
+                    height = maxHeight;
+                    width = width * ratio;
+                }
+
                 // Send image data to other users
                 try {
                     socket.send(JSON.stringify({
@@ -221,8 +312,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                             type: "image",
                             x: imagePosition.x,
                             y: imagePosition.y,
-                            width: img.width,
-                            height: img.height,
+                            width,
+                            height,
                             src: imageData,
                             id: Math.random().toString(36).substr(2, 9)
                         }),
@@ -280,12 +371,22 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
     };
 
+    // Socket connection status check
+    const isSocketConnected = socket && socket.readyState === WebSocket.OPEN;
+
     return (
         <div ref={containerRef} className="relative h-screen w-screen overflow-hidden">
             <canvas 
                 ref={canvasRef} 
                 className="absolute top-0 left-0 w-full h-full bg-[#222222]"
             />
+            
+            {/* Connection status indicator */}
+            {!isSocketConnected && (
+                <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md z-50">
+                    Disconnected - Trying to reconnect...
+                </div>
+            )}
             
             {/* Hidden file input for image uploads */}
             <input

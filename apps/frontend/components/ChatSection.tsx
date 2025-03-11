@@ -4,6 +4,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/app/auth/verify';
 import { Send } from 'lucide-react';
 
+interface Message {
+  userId: string;
+  user: { name: string };
+  message: string;
+  type?: string;
+}
+
 interface ChatSectionProps {
   roomId: string;
   socket: WebSocket | null;
@@ -11,12 +18,8 @@ interface ChatSectionProps {
 
 const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
   const [messageToSend, setMessageToSend] = useState('');
-  const [messages, setMessages] = useState<{
-    userId: any;
-    user: { name: string };
-    message: string;
-  }[]>([]);
-  const { username, userId } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const { userId } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,15 +34,21 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
     fetchChatData(roomId);
 
     if (socket) {
-      socket.onmessage = (event) => {
+      const messageHandler = (event: MessageEvent) => {
         try {
           const newMessage = JSON.parse(event.data);
-          if (newMessage.type === "text_chat")
-            console.log(newMessage)
+          if (newMessage.type === "text_chat") {
             setMessages((prev) => [...prev, newMessage]);
+          }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
+      };
+
+      socket.addEventListener('message', messageHandler);
+
+      return () => {
+        socket.removeEventListener('message', messageHandler);
       };
     }
   }, [roomId, socket]);
@@ -47,8 +56,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
   async function fetchChatData(roomId: string) {
     try {
       const response = await axios.get(`${BACKEND_URL}/chats/text_chats/${roomId}`);
-      console.log(response)
-      setMessages(response.data.messages);
+      setMessages(response.data.messages || []);
     } catch (error) {
       console.error('Error fetching chat data:', error);
     }
@@ -72,28 +80,29 @@ const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
     socket.send(JSON.stringify(messageData));
     setMessageToSend('');
   }
-  console.log(messages)
 
   return (
     <div className="flex flex-col h-full bg-[#222222] text-white">
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-3">
           {messages.map((msg, index) => (
-            //@ts-ignore
-            (!msg.type || msg.type==="text_chat")?
-            <div
-              key={index}
-              className={`flex flex-col max-w-[75%] ${
-                msg.userId === localStorage.getItem("userId")
-                  ? 'ml-auto items-end'
-                  : 'mr-auto items-start'
-              }`}
-            >
-              <span className="text-sm text-[#a7a7a7] mb-0.5">{msg.user.name}</span>
-              <div className="bg-[#2d2d2d] px-4 py-2 rounded-lg break-words">
-                <p className="text-base leading-6">{msg.message}</p>
+            (!msg.type || msg.type === "text_chat") ? (
+              <div
+                key={index}
+                className={`flex flex-col max-w-[75%] ${
+                  msg.userId === localStorage.getItem("userId")
+                    ? 'ml-auto items-end'
+                    : 'mr-auto items-start'
+                }`}
+              >
+                <span className="text-sm text-[#a7a7a7] mb-0.5">
+                  {msg.user?.name || 'Unknown'}
+                </span>
+                <div className="bg-[#2d2d2d] px-4 py-2 rounded-lg break-words">
+                  <p className="text-base leading-6">{msg.message}</p>
+                </div>
               </div>
-            </div>:null
+            ) : null
           ))}
           <div ref={messagesEndRef} />
         </div>
