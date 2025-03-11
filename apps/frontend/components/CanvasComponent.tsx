@@ -4,26 +4,27 @@ import React, { useEffect, useRef, useState } from 'react';
 import ChatSection from './ChatSection';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Circle, Square, Pencil, MousePointer, FileImage, Type, Check, X } from "lucide-react";
+import { Circle, Square, Pencil, MousePointer, FileImage, Type, Check, X, MessageCircle, MinimizeIcon, MaximizeIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import OnlineUsersDropdown from './OnlineUsersComponent';
+import AnimatedChalkDust from '@/components/AnimatedChalkDust';
 
 type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text";
 
-// Consistent colors array
+// Use the chalk colors from the landing page for consistency
 const CHALK_COLORS = [
     '#ffffff', // white
-    '#f5c431', // yellow
-    '#f59331', // orange
+    '#f5c431', // yellow - matches chalk-yellow
+    '#3165f5', // blue - matches chalk-blue
+    '#ff69b4', // pink - matches chalk-pink
     '#f55031', // red
     '#31f550', // green
     '#31f5f5', // cyan
-    '#3165f5', // blue
     '#9e31f5', // purple
-    '#ff69b4', // pink
-    '#808080', // gray
     '#d4af37', // gold
+    '#808080', // gray
+    '#f59331', // orange
     '#40e0d0', // turquoise
 ];
 
@@ -44,6 +45,9 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const { userId } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Array<{ name: string; userId: string }>>([]);
     const [canvasInitialized, setCanvasInitialized] = useState(false);
+    // Chat toggle state
+    const [isChatVisible, setIsChatVisible] = useState(true);
+    const [unreadMessages, setUnreadMessages] = useState(0);
 
     // Socket event listener
     useEffect(() => {
@@ -54,6 +58,9 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 const data = JSON.parse(event.data);
                 if (data.type === 'users_update') {
                     setOnlineUsers(data.users);
+                } else if (data.type === 'chat_message' && !isChatVisible) {
+                    // Increment unread count if chat is hidden
+                    setUnreadMessages(prev => prev + 1);
                 }
             } catch (error) {
                 console.error('Error parsing message:', error);
@@ -65,7 +72,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         return () => {
             socket.removeEventListener('message', handleMessage);
         };
-    }, [socket]);
+    }, [socket, isChatVisible]);
 
     // Handle canvas resize with proper debouncing
     useEffect(() => {
@@ -371,162 +378,210 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
     };
 
+    // Toggle chat visibility
+    const toggleChat = () => {
+        setIsChatVisible(!isChatVisible);
+        // Reset unread count when opening chat
+        if (!isChatVisible) {
+            setUnreadMessages(0);
+        }
+    };
+
     // Socket connection status check
     const isSocketConnected = socket && socket.readyState === WebSocket.OPEN;
 
     return (
-        <div ref={containerRef} className="relative h-screen w-screen overflow-hidden">
-            <canvas 
-                ref={canvasRef} 
-                className="absolute top-0 left-0 w-full h-full bg-[#222222]"
-            />
+        <div className="min-h-screen chalkboard overflow-hidden">
+            {/* Add chalk dust animation for consistency with landing page */}
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+                <AnimatedChalkDust intensity="low" />
+            </div>
             
-            {/* Connection status indicator */}
-            {!isSocketConnected && (
-                <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md z-50">
-                    Disconnected - Trying to reconnect...
-                </div>
-            )}
+            <OnlineUsersDropdown users={onlineUsers} />
             
-            {/* Hidden file input for image uploads */}
-            <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageUpload}
-                aria-label="Upload image"
-            />
+            <div ref={containerRef} className="relative h-screen w-screen overflow-hidden">
+                <canvas 
+                    ref={canvasRef} 
+                    className="absolute top-0 left-0 w-full h-full"
+                    // Remove the dark background color - the chalkboard class will provide the background
+                />
+                
+                {/* Connection status indicator - styled to match chalk theme */}
+                {!isSocketConnected && (
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md z-50 border-2 border-white">
+                        Disconnected - Trying to reconnect...
+                    </div>
+                )}
+                
+                {/* Hidden file input for image uploads */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    aria-label="Upload image"
+                />
 
-            {/* Text input overlay with formatting controls */}
-            {showTextInput && (
-                <Card className="absolute z-20 bg-[#333333] border-[#444444]"
-                    style={{
-                        left: textPosition.x,
-                        top: textPosition.y,
-                    }}>
-                    <CardContent className="p-4">
-                        <div className="flex gap-2 mb-2">
-                            <select
-                                className="bg-[#444444] text-white px-2 py-1 rounded"
-                                value={fontSize}
-                                onChange={(e) => setFontSize(Number(e.target.value))}
-                                aria-label="Font size"
-                            >
-                                {[12, 14, 16, 18, 20, 24, 28, 32].map(size => (
-                                    <option key={size} value={size}>{size}px</option>
-                                ))}
-                            </select>
+                {/* Text input overlay with formatting controls - styled to match chalk theme */}
+                {showTextInput && (
+                    <Card className="absolute z-20 bg-[#1a1a1a] border-[#444444]"
+                        style={{
+                            left: textPosition.x,
+                            top: textPosition.y,
+                        }}>
+                        <CardContent className="p-4">
+                            <div className="flex gap-2 mb-2">
+                                <select
+                                    className="bg-[#333333] text-white px-2 py-1 rounded border border-[#555555]"
+                                    value={fontSize}
+                                    onChange={(e) => setFontSize(Number(e.target.value))}
+                                    aria-label="Font size"
+                                >
+                                    {[12, 14, 16, 18, 20, 24, 28, 32].map(size => (
+                                        <option key={size} value={size}>{size}px</option>
+                                    ))}
+                                </select>
+                                <Button
+                                    variant={isBold ? "default" : "secondary"}
+                                    size="sm"
+                                    onClick={() => setIsBold(!isBold)}
+                                    className="font-bold"
+                                    aria-label="Bold"
+                                    aria-pressed={isBold}
+                                >
+                                    B
+                                </Button>
+                                <Button
+                                    variant={isItalic ? "default" : "secondary"}
+                                    size="sm"
+                                    onClick={() => setIsItalic(!isItalic)}
+                                    className="italic"
+                                    aria-label="Italic"
+                                    aria-pressed={isItalic}
+                                >
+                                    I
+                                </Button>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="w-8 h-8"
+                                            style={{ backgroundColor: selectedColor }}
+                                            aria-label="Select color"
+                                        />
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 bg-[#333333] border-[#555555]">
+                                        <ColorPicker />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <textarea
+                                ref={textInputRef}
+                                className="bg-[#333333] text-white border border-[#555555] p-2 rounded-md w-full min-w-[200px]"
+                                rows={4}
+                                placeholder="Enter text here..."
+                                style={{
+                                    fontSize: `${fontSize}px`,
+                                    fontWeight: isBold ? 'bold' : 'normal',
+                                    fontStyle: isItalic ? 'italic' : 'normal',
+                                    color: selectedColor
+                                }}
+                                onKeyDown={handleTextKeyDown}
+                            />
+                            <div className="flex justify-end gap-2 mt-2">
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setShowTextInput(false)}
+                                    aria-label="Cancel"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={handleTextSubmit}
+                                    aria-label="Submit text"
+                                >
+                                    <Check className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Tools panel - styled to match chalk theme */}
+                <Card className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#1a1a1a] w-auto z-10 border-[#555555]">
+                    <CardContent className="flex flex-col gap-2 p-2 justify-center items-center">
+                        {tools.map((tool) => (
                             <Button
-                                variant={isBold ? "default" : "secondary"}
-                                size="sm"
-                                onClick={() => setIsBold(!isBold)}
-                                className="font-bold"
-                                aria-label="Bold"
-                                aria-pressed={isBold}
+                                key={tool.type}
+                                variant={type === tool.type ? "default" : "secondary"}
+                                size="icon"
+                                onClick={() => setType(tool.type)}
+                                className={cn(
+                                    "w-10 h-10 bg-[#1a1a1a]",
+                                    type === tool.type ? "bg-[#444444] hover:bg-[#444444]" : "hover:bg-[#333333]",
+                                    "text-[#ffffff]"
+                                )}
+                                aria-label={tool.label}
+                                aria-pressed={type === tool.type}
                             >
-                                B
+                                <tool.icon className="h-5 w-5" />
                             </Button>
-                            <Button
-                                variant={isItalic ? "default" : "secondary"}
-                                size="sm"
-                                onClick={() => setIsItalic(!isItalic)}
-                                className="italic"
-                                aria-label="Italic"
-                                aria-pressed={isItalic}
-                            >
-                                I
-                            </Button>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        className="w-8 h-8"
-                                        style={{ backgroundColor: selectedColor }}
-                                        aria-label="Select color"
-                                    />
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <ColorPicker />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <textarea
-                            ref={textInputRef}
-                            className="bg-[#444444] text-white border border-[#555555] p-2 rounded-md w-full min-w-[200px]"
-                            rows={4}
-                            placeholder="Enter text here..."
-                            style={{
-                                fontSize: `${fontSize}px`,
-                                fontWeight: isBold ? 'bold' : 'normal',
-                                fontStyle: isItalic ? 'italic' : 'normal',
-                                color: selectedColor
-                            }}
-                            onKeyDown={handleTextKeyDown}
-                        />
-                        <div className="flex justify-end gap-2 mt-2">
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setShowTextInput(false)}
-                                aria-label="Cancel"
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={handleTextSubmit}
-                                aria-label="Submit text"
-                            >
-                                <Check className="w-4 h-4" />
-                            </Button>
-                        </div>
+                        ))}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="w-7 h-7 m-1 rounded-full flex justify-center items-center"
+                                    style={{ backgroundColor: selectedColor }}
+                                    aria-label="Color picker"
+                                />
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-[#333333] border-[#555555]">
+                                <ColorPicker />
+                            </PopoverContent>
+                        </Popover>
                     </CardContent>
                 </Card>
-            )}
 
-            {/* Tools panel */}
-            <Card className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#272727] w-auto z-10 border-[#3d3d3d]">
-                <CardContent className="flex flex-col gap-2 p-2 justify-center items-center">
-                    {tools.map((tool) => (
-                        <Button
-                            key={tool.type}
-                            variant={type === tool.type ? "default" : "secondary"}
-                            size="icon"
-                            onClick={() => setType(tool.type)}
-                            className={cn(
-                                "w-10 h-10 bg-[#272727]",
-                                type === tool.type ? "bg-[#444444] hover:bg-[#444444]" : "hover:bg-[#444444]",
-                                "text-[#d4d4d4]"
+                {/* Chat toggle button */}
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={toggleChat}
+                    className="absolute bottom-2 right-4 z-20 bg-[#333333] hover:bg-[#444444] text-white"
+                    aria-label={isChatVisible ? "Hide chat" : "Show chat"}
+                >
+                    {isChatVisible ? (
+                        <MinimizeIcon className="h-4 w-4 mr-1" />
+                    ) : (
+                        <>
+                            <MessageCircle className="h-4 w-4 mr-1" />
+                            {unreadMessages > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                    {unreadMessages > 9 ? '9+' : unreadMessages}
+                                </span>
                             )}
-                            aria-label={tool.label}
-                            aria-pressed={type === tool.type}
-                        >
-                            <tool.icon className="h-5 w-5" />
-                        </Button>
-                    ))}
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant="secondary"
-                                size="icon"
-                                className="w-7 h-7 m-1 rounded-full flex justify-center items-center"
-                                style={{ backgroundColor: selectedColor }}
-                                aria-label="Color picker"
-                            />
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <ColorPicker />
-                        </PopoverContent>
-                    </Popover>
-                </CardContent>
-            </Card>
+                        </>
+                    )}
+                    {isChatVisible ? "Hide Chat" : "Chat"}
+                </Button>
 
-            <Card className="absolute bottom-2 right-4 w-80 h-96 bg-[#222222] z-10 border-0 overflow-auto scrollbar-hide">
-                <OnlineUsersDropdown users={onlineUsers} />
-                <ChatSection roomId={roomId} socket={socket} />
-            </Card>
+                {/* Chat section - with toggle functionality and normal text style */}
+                {isChatVisible && (
+                    <Card className="absolute bottom-10 right-4 w-80 h-96 bg-[#1a1a1a] z-10 border border-[#555555] rounded-md overflow-hidden">
+                        <CardContent className="p-0 h-full font-normal">
+                            <div className="w-full h-full">
+                                <ChatSection roomId={roomId} socket={socket} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
         </div>
     );
 };
