@@ -118,7 +118,7 @@ app.get("/chats/:roomdId",async (req,res)=>{
       id: "desc"
     }
   })
-
+  console.log(messages)
   res.status(200).json({messages})
 }) 
 
@@ -132,9 +132,6 @@ app.get("/chats/text_chats/:roomdId",async (req,res)=>{
     where: {
       roomId: roomId,
     },
-    orderBy: {
-      id: "desc",
-    },
     take: 50,
     include: {
       user: {
@@ -144,8 +141,6 @@ app.get("/chats/text_chats/:roomdId",async (req,res)=>{
       },
     },
   });
-  
-  console.log(messages);
   
 
   res.status(200).json({messages})

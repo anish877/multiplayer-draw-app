@@ -72,7 +72,7 @@ wss.on("connection",(ws,request)=>{
         else if(parsedData.type==="chat"){
             users.forEach(user=>{
                 if(user.rooms.includes(parsedData.roomId)){
-                    user.ws.send(JSON.stringify({type:"chat",message:parsedData.message}))
+                    user.ws.send(JSON.stringify({type:"chat",message:parsedData.message,userId:parsedData.userId}))
                 }
             })
             await prismaClient.chat.create({

@@ -16,6 +16,7 @@ type Shape = {
     height: number;
     color?: string;
     id?: string;
+    iseditable: boolean
 } | {
     type: "circle";
     startx: number;
@@ -24,11 +25,13 @@ type Shape = {
     clienty: number;
     color?: string;
     id?: string;
+    iseditable: boolean
 } | {
     type: "pencil";
     points: Point[];
     color?: string;
     id?: string;
+    iseditable: boolean
 } | {
     type: "text";
     x: number;
@@ -41,6 +44,7 @@ type Shape = {
         isBold: boolean;
         isItalic: boolean;
     };
+    iseditable: boolean
 } | {
     type: "image";
     x: number;
@@ -49,6 +53,7 @@ type Shape = {
     height: number;
     src: string;
     id?: string;
+    iseditable: boolean
 };
 
 const CHALK_COLORS = [
@@ -70,7 +75,8 @@ function isPointInImage(x: number, y: number, image: Extract<Shape, {type: "imag
 
 // Generate a simple unique ID
 function generateId(): string {
-    return Math.random().toString(36).substring(2, 9)+Date.now().toString;
+    // Fixed: Return the actual value instead of concatenating functions
+    return Math.random().toString(36).substring(2, 9) + Date.now().toString();
 }
 
 // Check if point is inside rectangle
@@ -154,19 +160,23 @@ function drawImage(shape: Extract<Shape, {type: "image"}>, ctx: CanvasRenderingC
 
 // Update the isPointInShape function to include image type
 function isPointInShape(x: number, y: number, shape: Shape): boolean {
-    switch (shape.type) {
-        case "rect":
-            return isPointInRect(x, y, shape);
-        case "circle":
-            return isPointInCircle(x, y, shape);
-        case "pencil":
-            return isPointInPencil(x, y, shape);
-        case "text":
-            return isPointInText(x, y, shape);
-        case "image":
-            return isPointInImage(x, y, shape);
-        default:
-            return false;
+    if(shape.iseditable){
+        switch (shape.type) {
+            case "rect":
+                return isPointInRect(x, y, shape);
+            case "circle":
+                return isPointInCircle(x, y, shape);
+            case "pencil":
+                return isPointInPencil(x, y, shape);
+            case "text":
+                return isPointInText(x, y, shape);
+            case "image":
+                return isPointInImage(x, y, shape);
+            default:
+                return false;
+        }
+    } else {
+        return false;
     }
 }
 
@@ -198,47 +208,73 @@ export async function initDraw(
     ctx.lineWidth = 2;
     ctx.font = '16px sans-serif';
     
-    let existingShapes: Shape[] = await getExistingShapes(roomId);
+    let existingShapes: Shape[] = await getExistingShapes(roomId, userId);
     clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
 
     // Store message handler reference so we can remove it later
-    // Update handleSocketMessage in initDraw to handle image_element messages
-const handleSocketMessage = (e: MessageEvent) => {
-    try {
-        const message = JSON.parse(e.data);
-        
-        if (message.type === "chat" || message.type === "image_element") {
-            const parsedMessage = message.type === "chat" ? message.message : JSON.stringify(JSON.parse(message.message));
-            const parsedShape = JSON.parse(parsedMessage);
+    // Update handleSocketMessage to properly parse and handle messages
+    const handleSocketMessage = (e: MessageEvent) => {
+        try {
+            const message = JSON.parse(e.data);
             
-            // Check if this is an update to an existing shape
-            const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
-            if (existingIndex >= 0) {
-                existingShapes[existingIndex] = parsedShape;
-            } else {
-                existingShapes.push(parsedShape);
-            }
-            
-            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-        } else if (message.type === "delete_chat") {
-            try {
-                const deletedShape = JSON.parse(message.message);
-                existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
+            if (message.type === "chat" || message.type === "image_element") {
+                // Fixed: Proper parsing of messages
+                let parsedShape: Shape;
                 
-                // If the deleted shape was selected, deselect it
-                if (selectedShape && selectedShape.id === deletedShape.id) {
-                    selectedShape = null;
+                if (message.type === "chat") {
+                    try {
+                        parsedShape = JSON.parse(message.message);
+                    } catch (err) {
+                        console.error("Error parsing chat message:", err);
+                        return;
+                    }
+                } else {
+                    try {
+                        parsedShape = JSON.parse(message.message);
+                    } catch (err) {
+                        console.error("Error parsing image element:", err);
+                        return;
+                    }
+                }
+                
+                // Check if this is an update to an existing shape
+                const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
+                if (existingIndex >= 0) {
+                    existingShapes[existingIndex] = parsedShape;
+                } else {
+                    // Fixed: Set iseditable properly
+                    if (message.userId === userId) {
+                        parsedShape.iseditable = true;
+                    } else {
+                        parsedShape.iseditable = false;
+                    }
+                    existingShapes.push(parsedShape);
                 }
                 
                 clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-            } catch (err) {
-                console.error("Error parsing deleted shape:", err);
+            } else if (message.type === "delete_chat") {
+                try {
+                    // Fixed: Proper parsing of deleted shape
+                    const deletedShape = JSON.parse(message.message);
+                    
+                    // Find and remove the shape with matching ID
+                    existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
+                    
+                    // If the deleted shape was selected, deselect it
+                    if (selectedShape && selectedShape.id === deletedShape.id) {
+                        selectedShape = null;
+                        oldSelectedShape = null;
+                    }
+                    
+                    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
+                } catch (err) {
+                    console.error("Error parsing deleted shape:", err);
+                }
             }
+        } catch (err) {
+            console.error("Error processing message:", err);
         }
-    } catch (err) {
-        console.error("Error processing message:", err);
-    }
-};
+    };
 
     // Add the message handler
     socket.addEventListener("message", handleSocketMessage);
@@ -246,55 +282,55 @@ const handleSocketMessage = (e: MessageEvent) => {
     // Define event handler functions
     const handleMouseDown = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
 
-    // Check if we're clicking on an existing shape, but only in select mode
-    if (type === "select") {
-        let found = false;
-        // Iterate in reverse to select the topmost shape first
-        for (let i = existingShapes.length - 1; i >= 0; i--) {
-            const shape = existingShapes[i];
-            if (isPointInShape(x, y, shape)) {
-                selectedShape = shape;
-                // Store original shape for deletion
-                oldSelectedShape = JSON.parse(JSON.stringify(shape));
-                isDragging = true;
-                found = true;
-                
-                // Calculate drag offset
-                if (shape.type === "rect" || shape.type === "image") {
-                    dragOffsetX = x - shape.x;
-                    dragOffsetY = y - shape.y;
-                } else if (shape.type === "circle") {
-                    const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
-                    const centerY = shape.starty + (shape.clienty - shape.starty) * 0.5;
-                    dragOffsetX = x - centerX;
-                    dragOffsetY = y - centerY;
-                } else if (shape.type === "pencil") {
-                    let minX = Infinity, minY = Infinity;
-                    shape.points.forEach(point => {
-                        minX = Math.min(minX, point.x);
-                        minY = Math.min(minY, point.y);
-                    });
-                    dragOffsetX = x - minX;
-                    dragOffsetY = y - minY;
-                } else if (shape.type === "text") {
-                    dragOffsetX = x - shape.x;
-                    dragOffsetY = y - shape.y;
+        // Check if we're clicking on an existing shape, but only in select mode
+        if (type === "select") {
+            let found = false;
+            // Iterate in reverse to select the topmost shape first
+            for (let i = existingShapes.length - 1; i >= 0; i--) {
+                const shape = existingShapes[i];
+                if (isPointInShape(x, y, shape)) {
+                    selectedShape = shape;
+                    // Store original shape for deletion
+                    oldSelectedShape = JSON.parse(JSON.stringify(shape));
+                    isDragging = true;
+                    found = true;
+                    
+                    // Calculate drag offset
+                    if (shape.type === "rect" || shape.type === "image") {
+                        dragOffsetX = x - shape.x;
+                        dragOffsetY = y - shape.y;
+                    } else if (shape.type === "circle") {
+                        const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
+                        const centerY = shape.starty + (shape.clienty - shape.starty) * 0.5;
+                        dragOffsetX = x - centerX;
+                        dragOffsetY = y - centerY;
+                    } else if (shape.type === "pencil") {
+                        let minX = Infinity, minY = Infinity;
+                        shape.points.forEach(point => {
+                            minX = Math.min(minX, point.x);
+                            minY = Math.min(minY, point.y);
+                        });
+                        dragOffsetX = x - minX;
+                        dragOffsetY = y - minY;
+                    } else if (shape.type === "text") {
+                        dragOffsetX = x - shape.x;
+                        dragOffsetY = y - shape.y;
+                    }
+                    
+                    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
+                    break;
                 }
-                
-                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-                break;
             }
-        }
-        
-        if (!found) {
-            selectedShape = null;
-            oldSelectedShape = null;
-            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
-        }
-        return;
+            
+            if (!found) {
+                selectedShape = null;
+                oldSelectedShape = null;
+                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
+            }
+            return;
         }
         
         // If not in select mode, start drawing
@@ -308,7 +344,8 @@ const handleSocketMessage = (e: MessageEvent) => {
                     type: "pencil",
                     points: [{x, y}],
                     color: selectedColor,
-                    id: generateId()
+                    id: generateId(),
+                    iseditable: true
                 };
                 break;
             case "rect":
@@ -319,7 +356,8 @@ const handleSocketMessage = (e: MessageEvent) => {
                     width: 0,
                     height: 0,
                     color: selectedColor,
-                    id: generateId()
+                    id: generateId(),
+                    iseditable: true
                 };
                 break;
             case "circle":
@@ -330,7 +368,8 @@ const handleSocketMessage = (e: MessageEvent) => {
                     clientx: x,
                     clienty: y,
                     color: selectedColor,
-                    id: generateId()
+                    id: generateId(),
+                    iseditable: true
                 };
                 break;
             case "text":
@@ -345,7 +384,8 @@ const handleSocketMessage = (e: MessageEvent) => {
                         fontSize: 16,
                         isBold: false,
                         isItalic: false
-                    }
+                    },
+                    iseditable: true
                 };
                 
                 // Show a prompt to enter text
@@ -519,7 +559,8 @@ const handleSocketMessage = (e: MessageEvent) => {
     
     // Add event listener for delete key
     const handleKeyDown = (e: KeyboardEvent) => {
-        if ((e.key === "Delete" || e.key === "Backspace") && selectedShape) {
+        // Fixed: Check if we have a selected shape and ensure it's editable
+        if ((e.key === "Delete" || e.key === "Backspace") && selectedShape && selectedShape.iseditable) {
             // Remove from existing shapes
             existingShapes = existingShapes.filter(s => s.id !== selectedShape?.id);
             
@@ -668,7 +709,7 @@ function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
     ctx.restore();
 }
 
-async function getExistingShapes(roomId: string): Promise<Shape[]> {
+async function getExistingShapes(roomId: string, userId: string): Promise<Shape[]> {
     try {
         const response = await axios.get(`${BACKEND_URL}/chats/${roomId}`);
         const messages = response.data.messages;
@@ -680,21 +721,37 @@ async function getExistingShapes(roomId: string): Promise<Shape[]> {
         
         return messages
             .filter((x: any) => x && typeof x.message === 'string')
-            .map((x: {message: string}) => {
+            .map((x: {message: string, userId: string}) => {
                 try {
-                    const shape = JSON.parse(x.message);
-                    console.log(shape)
+                    // Fixed: Better error handling for parsing
+                    let shape: Shape;
+                    try {
+                        shape = JSON.parse(x.message);
+                    } catch (err) {
+                        console.error("Failed to parse shape:", x.message);
+                        return null;
+                    }
+                    
+                    // Set editable flag based on ownership
+                    if(x.userId === userId) {
+                        shape.iseditable = true;
+                    } else {
+                        shape.iseditable = false;
+                    }
+                    
                     // Ensure each shape has an ID
                     if (!shape.id) {
                         shape.id = generateId();
                     }
+                    
                     // Validate shape type
-                    if (!['rect', 'circle', 'pencil', 'text','image'].includes(shape.type)) {
+                    if (!['rect', 'circle', 'pencil', 'text', 'image'].includes(shape.type)) {
                         return null;
                     }
+                    
                     return shape;
                 } catch (err) {
-                    console.error("Error parsing shape:", err);
+                    console.error("Error processing shape:", err);
                     return null;
                 }
             })

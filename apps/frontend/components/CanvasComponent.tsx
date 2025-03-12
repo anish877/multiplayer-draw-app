@@ -12,20 +12,20 @@ import AnimatedChalkDust from '@/components/AnimatedChalkDust';
 
 type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text";
 
-// Use the chalk colors from the landing page for consistency
+// Colors that mimic chalk on a green blackboard
 const CHALK_COLORS = [
-    '#ffffff', // white
-    '#f5c431', // yellow - matches chalk-yellow
-    '#3165f5', // blue - matches chalk-blue
-    '#ff69b4', // pink - matches chalk-pink
-    '#f55031', // red
-    '#31f550', // green
-    '#31f5f5', // cyan
-    '#9e31f5', // purple
-    '#d4af37', // gold
-    '#808080', // gray
-    '#f59331', // orange
-    '#40e0d0', // turquoise
+    '#ffffff', // white - classic chalk
+    '#f9eaa9', // soft yellow - muted chalk
+    '#c4d8f5', // light blue - softer blue
+    '#f7c4d8', // pale pink - dusty chalk pink
+    '#f7bdb4', // pale red/salmon - more chalk-like
+    '#c2e6c8', // light green - visible on dark green
+    '#c2e6e6', // pale cyan - dusty chalk cyan
+    '#e2c8f0', // lavender - dusty chalk purple
+    '#f0e6c0', // soft gold - more natural chalk gold
+    '#c8c8c8', // light gray - natural chalk gray
+    '#f7d9c4', // peach - softer orange tone
+    '#c0e8e0', // pale turquoise - chalk-like turquoise
 ];
 
 const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) => {
