@@ -9,25 +9,31 @@ import { User, Key, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import Footer from '@/components/Footer';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import { BACKEND_URL } from '@/app/config';
+import { useAuth } from '../verify';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showDust, setShowDust] = useState(false);
   const router = useRouter()
+  const {token,setToken,userId,setUserId,username,setUsername} = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setShowDust(true);
     setTimeout(() => setShowDust(false), 1000);
 
     // This is where you would handle actual authentication
     if (email && password) {
-      toast.success("Login successful!", {
-        description: "Welcome back to Sketch & Chat!",
-        duration: 3000,
-      });
-      setTimeout(() => router.push('/'), 1500);
+      const response = await axios.post(BACKEND_URL+"/login",{name,email,password})
+        setToken(response.data.token)
+        setUserId(response.data.userId)
+        setUsername(response.data.name)
+        console.log(token)
+        console.log(username)
+        router.push("/canvas/1")
     } else {
       toast.error("Login failed", {
         description: "Please check your credentials and try again.",
@@ -82,7 +88,7 @@ const Login = () => {
                 </label>
                 <div className="relative">
                   <input
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-transparent border-2 border-dashed border-white/30 rounded-md px-4 py-2 text-chalk-white font-hand focus:outline-none focus:border-chalk-yellow/50"

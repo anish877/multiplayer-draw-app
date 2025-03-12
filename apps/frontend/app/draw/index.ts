@@ -41,7 +41,15 @@ type Shape = {
         isBold: boolean;
         isItalic: boolean;
     };
-}
+} | {
+    type: "image";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    src: string;
+    id?: string;
+};
 
 const CHALK_COLORS = [
     '#ffffff', // white
@@ -53,6 +61,12 @@ const CHALK_COLORS = [
     '#3165f5', // blue
     '#9e31f5', // purple
 ];
+
+// Add isPointInImage function for selection
+function isPointInImage(x: number, y: number, image: Extract<Shape, {type: "image"}>): boolean {
+    return x >= image.x && x <= image.x + image.width && 
+           y >= image.y && y <= image.y + image.height;
+}
 
 // Generate a simple unique ID
 function generateId(): string {
@@ -110,7 +124,35 @@ function isPointInText(x: number, y: number, text: Extract<Shape, {type: "text"}
            y >= text.y && y <= text.y + height;
 }
 
-// Helper function to check if point is inside any shape
+function drawImage(shape: Extract<Shape, {type: "image"}>, ctx: CanvasRenderingContext2D) {
+    // Create a new image element
+    const img = new Image();
+    
+    // Set the image source to trigger loading
+    img.src = shape.src;
+    
+    // Set a onload handler to draw the image once it's loaded
+    img.onload = () => {
+        ctx.drawImage(img, shape.x, shape.y, shape.width, shape.height);
+    };
+    
+    // Handle potential errors
+    img.onerror = () => {
+        console.error('Error loading image');
+        // Draw a placeholder with an error message
+        ctx.save();
+        ctx.fillStyle = '#ff6666';
+        ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
+        ctx.fillStyle = '#000000';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Image Load Error', shape.x + shape.width/2, shape.y + shape.height/2);
+        ctx.restore();
+    };
+}
+
+// Update the isPointInShape function to include image type
 function isPointInShape(x: number, y: number, shape: Shape): boolean {
     switch (shape.type) {
         case "rect":
@@ -121,6 +163,8 @@ function isPointInShape(x: number, y: number, shape: Shape): boolean {
             return isPointInPencil(x, y, shape);
         case "text":
             return isPointInText(x, y, shape);
+        case "image":
+            return isPointInImage(x, y, shape);
         default:
             return false;
     }
@@ -158,41 +202,43 @@ export async function initDraw(
     clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
 
     // Store message handler reference so we can remove it later
-    const handleSocketMessage = (e: MessageEvent) => {
-        try {
-            const message = JSON.parse(e.data);
+    // Update handleSocketMessage in initDraw to handle image_element messages
+const handleSocketMessage = (e: MessageEvent) => {
+    try {
+        const message = JSON.parse(e.data);
+        
+        if (message.type === "chat" || message.type === "image_element") {
+            const parsedMessage = message.type === "chat" ? message.message : JSON.stringify(JSON.parse(message.message));
+            const parsedShape = JSON.parse(parsedMessage);
             
-            if (message.type === "chat") {
-                const parsedShape = JSON.parse(message.message);
+            // Check if this is an update to an existing shape
+            const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
+            if (existingIndex >= 0) {
+                existingShapes[existingIndex] = parsedShape;
+            } else {
+                existingShapes.push(parsedShape);
+            }
+            
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
+        } else if (message.type === "delete_chat") {
+            try {
+                const deletedShape = JSON.parse(message.message);
+                existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
                 
-                // Check if this is an update to an existing shape
-                const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
-                if (existingIndex >= 0) {
-                    existingShapes[existingIndex] = parsedShape;
-                } else {
-                    existingShapes.push(parsedShape);
+                // If the deleted shape was selected, deselect it
+                if (selectedShape && selectedShape.id === deletedShape.id) {
+                    selectedShape = null;
                 }
                 
                 clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-            } else if (message.type === "delete_chat") {
-                try {
-                    const deletedShape = JSON.parse(message.message);
-                    existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
-                    
-                    // If the deleted shape was selected, deselect it
-                    if (selectedShape && selectedShape.id === deletedShape.id) {
-                        selectedShape = null;
-                    }
-                    
-                    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-                } catch (err) {
-                    console.error("Error parsing deleted shape:", err);
-                }
+            } catch (err) {
+                console.error("Error parsing deleted shape:", err);
             }
-        } catch (err) {
-            console.error("Error processing message:", err);
         }
-    };
+    } catch (err) {
+        console.error("Error processing message:", err);
+    }
+};
 
     // Add the message handler
     socket.addEventListener("message", handleSocketMessage);
@@ -200,55 +246,55 @@ export async function initDraw(
     // Define event handler functions
     const handleMouseDown = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-    
-        // Check if we're clicking on an existing shape, but only in select mode
-        if (type === "select") {
-            let found = false;
-            // Iterate in reverse to select the topmost shape first
-            for (let i = existingShapes.length - 1; i >= 0; i--) {
-                const shape = existingShapes[i];
-                if (isPointInShape(x, y, shape)) {
-                    selectedShape = shape;
-                    // Store original shape for deletion
-                    oldSelectedShape = JSON.parse(JSON.stringify(shape));
-                    isDragging = true;
-                    found = true;
-                    
-                    // Calculate drag offset
-                    if (shape.type === "rect") {
-                        dragOffsetX = x - shape.x;
-                        dragOffsetY = y - shape.y;
-                    } else if (shape.type === "circle") {
-                        const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
-                        const centerY = shape.starty + (shape.clienty - shape.starty) * 0.5;
-                        dragOffsetX = x - centerX;
-                        dragOffsetY = y - centerY;
-                    } else if (shape.type === "pencil") {
-                        let minX = Infinity, minY = Infinity;
-                        shape.points.forEach(point => {
-                            minX = Math.min(minX, point.x);
-                            minY = Math.min(minY, point.y);
-                        });
-                        dragOffsetX = x - minX;
-                        dragOffsetY = y - minY;
-                    } else if (shape.type === "text") {
-                        dragOffsetX = x - shape.x;
-                        dragOffsetY = y - shape.y;
-                    }
-                    
-                    clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-                    break;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if we're clicking on an existing shape, but only in select mode
+    if (type === "select") {
+        let found = false;
+        // Iterate in reverse to select the topmost shape first
+        for (let i = existingShapes.length - 1; i >= 0; i--) {
+            const shape = existingShapes[i];
+            if (isPointInShape(x, y, shape)) {
+                selectedShape = shape;
+                // Store original shape for deletion
+                oldSelectedShape = JSON.parse(JSON.stringify(shape));
+                isDragging = true;
+                found = true;
+                
+                // Calculate drag offset
+                if (shape.type === "rect" || shape.type === "image") {
+                    dragOffsetX = x - shape.x;
+                    dragOffsetY = y - shape.y;
+                } else if (shape.type === "circle") {
+                    const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
+                    const centerY = shape.starty + (shape.clienty - shape.starty) * 0.5;
+                    dragOffsetX = x - centerX;
+                    dragOffsetY = y - centerY;
+                } else if (shape.type === "pencil") {
+                    let minX = Infinity, minY = Infinity;
+                    shape.points.forEach(point => {
+                        minX = Math.min(minX, point.x);
+                        minY = Math.min(minY, point.y);
+                    });
+                    dragOffsetX = x - minX;
+                    dragOffsetY = y - minY;
+                } else if (shape.type === "text") {
+                    dragOffsetX = x - shape.x;
+                    dragOffsetY = y - shape.y;
                 }
+                
+                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
+                break;
             }
-            
-            if (!found) {
-                selectedShape = null;
-                oldSelectedShape = null;
-                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
-            }
-            return;
+        }
+        
+        if (!found) {
+            selectedShape = null;
+            oldSelectedShape = null;
+            clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
+        }
+        return;
         }
         
         // If not in select mode, start drawing
@@ -334,7 +380,7 @@ export async function initDraw(
         // Only allow dragging in select mode
         if (isDragging && selectedShape && type === "select") {
             // Move the selected shape
-            if (selectedShape.type === "rect") {
+            if (selectedShape.type === "rect" || selectedShape.type === "image" || selectedShape.type === "text") {
                 selectedShape.x = x - dragOffsetX;
                 selectedShape.y = y - dragOffsetY;
             } else if (selectedShape.type === "circle") {
@@ -358,9 +404,6 @@ export async function initDraw(
                     x: point.x + dx,
                     y: point.y + dy
                 }));
-            } else if (selectedShape.type === "text") {
-                selectedShape.x = x - dragOffsetX;
-                selectedShape.y = y - dragOffsetY;
             }
             
             clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
@@ -613,6 +656,13 @@ function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
             width + 10,
             height + 10
         );
+    } else if (shape.type === "image") {
+        ctx.strokeRect(
+            shape.x - 5,
+            shape.y - 5,
+            shape.width + 10,
+            shape.height + 10
+        );
     }
     
     ctx.restore();
@@ -633,12 +683,13 @@ async function getExistingShapes(roomId: string): Promise<Shape[]> {
             .map((x: {message: string}) => {
                 try {
                     const shape = JSON.parse(x.message);
+                    console.log(shape)
                     // Ensure each shape has an ID
                     if (!shape.id) {
                         shape.id = generateId();
                     }
                     // Validate shape type
-                    if (!['rect', 'circle', 'pencil', 'text'].includes(shape.type)) {
+                    if (!['rect', 'circle', 'pencil', 'text','image'].includes(shape.type)) {
                         return null;
                     }
                     return shape;
@@ -675,6 +726,9 @@ function drawShape(shape: Shape, ctx: CanvasRenderingContext2D, roughCanvas: Rou
             break;
         case "text":
             drawText(shape, ctx);
+            break;
+        case "image":
+            drawImage(shape, ctx);
             break;
     }
 }

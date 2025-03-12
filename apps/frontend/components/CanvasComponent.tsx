@@ -310,7 +310,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     height = maxHeight;
                     width = width * ratio;
                 }
-
+                console.log(imageData)
                 // Send image data to other users
                 try {
                     socket.send(JSON.stringify({

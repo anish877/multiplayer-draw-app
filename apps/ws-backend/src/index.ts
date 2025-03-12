@@ -3,6 +3,7 @@ import jwt, { JwtPayload } from "jsonwebtoken"
 const wss = new WebSocketServer({port:8080})
 import { JWT_SECRET } from "backend-common/config"
 import { prismaClient } from "db/config"
+import { v2 as cloudinary } from "cloudinary"
 
 interface Users {
     rooms: String[],
@@ -12,6 +13,12 @@ interface Users {
 }
 
 const users : Users[] = []
+
+cloudinary.config({
+    cloud_name: 'dyxsai3xf',
+    api_key: '247246481321692',
+    api_secret: 'FWr9b-GToAKYxT5Hs36Fumz7sKQ'
+  });
 
 wss.on("connection",(ws,request)=>{
     const url = request.url
@@ -108,6 +115,34 @@ wss.on("connection",(ws,request)=>{
                 }
             })
         }
+        else if(parsedData.type === "image_element") {
+            try {
+              const message = JSON.parse(parsedData.message)
+              const uploadResponse = await cloudinary.uploader.upload(message.src, {
+                folder: 'chat_images',
+              });
+              message.src = uploadResponse.secure_url
+              parsedData.message = JSON.stringify(message)
+              console.log(uploadResponse.secure_url)
+              users.forEach(user => {
+                if(user.rooms.includes(parsedData.roomId)) {
+                  user.ws.send(JSON.stringify({
+                    type: "image_element",message:parsedData.message, userId:parsedData.userId, user:{name:parsedData.name}}))
+                }
+              });
+              await prismaClient.chat.create({
+                data: {
+                    roomId: parseInt(parsedData.roomId),
+                    message: parsedData.message,
+                    userId: parsedData.userId
+                }
+              });
+          
+            } catch (error) {
+              console.error('Error handling image upload:', error);
+              // Handle error appropriately
+            }
+        }          
         console.log(users)
     })
 
