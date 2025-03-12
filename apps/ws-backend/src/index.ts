@@ -140,7 +140,6 @@ wss.on("connection",(ws,request)=>{
           
             } catch (error) {
               console.error('Error handling image upload:', error);
-              // Handle error appropriately
             }
         }          
         console.log(users)
