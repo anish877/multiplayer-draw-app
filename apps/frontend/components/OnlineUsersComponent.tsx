@@ -26,7 +26,7 @@ const OnlineUsersDropdown = ({ users }: { users: { name: string; userId: string 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent 
-          className="w-56 bg-[#272727] border-[#3d3d3d] text-[#d4d4d4]"
+          className="w-56 bg-[#272727] border-[#3d3d3d] text-[#d4d4d4] font-sans"
         >
           <DropdownMenuLabel>Online Users</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#3d3d3d]" />

@@ -1,31 +1,32 @@
 import { useAuth } from '@/app/auth/verify/index';
 import { initDraw } from '@/app/draw';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ChatSection from './ChatSection';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Circle, Square, Pencil, MousePointer, FileImage, Type, Check, X, MessageCircle, MinimizeIcon, MaximizeIcon } from "lucide-react";
+import { Circle, Square, Pencil, MousePointer, FileImage, Type, Check, X, MessageCircle, MinimizeIcon, ZoomIn, ZoomOut, Move, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import OnlineUsersDropdown from './OnlineUsersComponent';
 import AnimatedChalkDust from '@/components/AnimatedChalkDust';
+import AIDrawingGenerator from './AIDrawingGenerator';
 
-type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text";
+type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text" | "pan";
 
-// Colors that mimic chalk on a green blackboard
+// Colors that mimic glowing chalk on a black blackboard
 const CHALK_COLORS = [
-    '#ffffff', // white - classic chalk
-    '#f9eaa9', // soft yellow - muted chalk
-    '#c4d8f5', // light blue - softer blue
-    '#f7c4d8', // pale pink - dusty chalk pink
-    '#f7bdb4', // pale red/salmon - more chalk-like
-    '#c2e6c8', // light green - visible on dark green
-    '#c2e6e6', // pale cyan - dusty chalk cyan
-    '#e2c8f0', // lavender - dusty chalk purple
-    '#f0e6c0', // soft gold - more natural chalk gold
-    '#c8c8c8', // light gray - natural chalk gray
-    '#f7d9c4', // peach - softer orange tone
-    '#c0e8e0', // pale turquoise - chalk-like turquoise
+    '#ffffff', // white with glow/translucency
+    '#f9eaa9', // soft yellow with glow
+    '#a0c0ff', // brighter blue with glow
+    '#ffb0d0', // brighter pink with glow
+    '#ffa599', // brighter salmon with glow
+    '#a0ffa0', // brighter green with glow
+    '#a0ffff', // brighter cyan with glow
+    '#e0a0ff', // brighter lavender with glow
+    '#ffe0a0', // brighter gold with glow
+    '#e0e0e0', // brighter gray with glow
+    '#ffbf99', // brighter peach with glow
+    '#a0ffe0', // brighter turquoise with glow
 ];
 
 const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) => {
@@ -53,7 +54,17 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     // Track when an object is being moved
     const [isMovingObject, setIsMovingObject] = useState(false);
     const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-    const {username} = useAuth()
+    const {username} = useAuth();
+
+    // Canvas transformation state
+    const [scale, setScale] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
+    const [startPanPoint, setStartPanPoint] = useState({ x: 0, y: 0 });
+    const [minZoom, setMinZoom] = useState(0.1);
+    const [maxZoom, setMaxZoom] = useState(5);
+    // Add new state for AI Drawing generator modal
+    const [showAIDrawingModal, setShowAIDrawingModal] = useState(false);
 
     // Socket event listener
     useEffect(() => {
@@ -165,25 +176,167 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [canvasInitialized]);
 
+    // Apply transformations to canvas context
+    const applyTransformations = useCallback((ctx: CanvasRenderingContext2D) => {
+        // Clear canvas with the transformation reset
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        
+        // Apply transformations
+        ctx.setTransform(
+            scale, 0, 0, scale, 
+            offset.x, offset.y
+        );
+        
+        // You might want to apply a background here if needed
+        // ctx.fillStyle = "#000000";
+        // ctx.fillRect(-offset.x/scale, -offset.y/scale, ctx.canvas.width/scale, ctx.canvas.height/scale);
+    }, [scale, offset]);
+
+    // Convert screen coordinates to canvas coordinates
+    const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
+        if (!canvasRef.current) return { x: 0, y: 0 };
+        
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = (screenX - rect.left - offset.x) / scale;
+        const y = (screenY - rect.top - offset.y) / scale;
+        
+        return { x, y };
+    }, [scale, offset]);
+
+    // Handle panning
+    const handlePanning = useCallback((e: MouseEvent) => {
+        if (!isPanning || type !== "pan") return;
+        
+        const dx = e.clientX - startPanPoint.x;
+        const dy = e.clientY - startPanPoint.y;
+        
+        setOffset(prev => ({
+            x: prev.x + dx,
+            y: prev.y + dy
+        }));
+        
+        setStartPanPoint({
+            x: e.clientX,
+            y: e.clientY
+        });
+        
+        // Redraw canvas with new offset
+        if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            if (ctx) {
+                applyTransformations(ctx);
+                // You would need to redraw all canvas objects here
+                // For simplicity, we'll rely on the useEffect that watches offset changes
+            }
+        }
+    }, [isPanning, type, startPanPoint, applyTransformations]);
+
+    // Start panning
+    const startPanning = useCallback((e: MouseEvent) => {
+        if (type !== "pan") return;
+        
+        setIsPanning(true);
+        setStartPanPoint({
+            x: e.clientX,
+            y: e.clientY
+        });
+    }, [type]);
+
+    // End panning
+    const endPanning = useCallback(() => {
+        setIsPanning(false);
+    }, []);
+
+    // Add panning event listeners
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        canvas.addEventListener('mousedown', startPanning);
+        window.addEventListener('mousemove', handlePanning);
+        window.addEventListener('mouseup', endPanning);
+        
+        return () => {
+            canvas.removeEventListener('mousedown', startPanning);
+            window.removeEventListener('mousemove', handlePanning);
+            window.removeEventListener('mouseup', endPanning);
+        };
+    }, [startPanning, handlePanning, endPanning]);
+
+    // Handle zooming with wheel
+    const handleWheel = useCallback((e: WheelEvent) => {
+        e.preventDefault();
+        
+        // Calculate where in the canvas the mouse is pointing before zoom
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Calculate point in unzoomed canvas coordinates
+        const pointXBeforeZoom = (mouseX - offset.x) / scale;
+        const pointYBeforeZoom = (mouseY - offset.y) / scale;
+        
+        // Adjust zoom based on wheel direction
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        const newScale = Math.max(minZoom, Math.min(maxZoom, scale * zoomFactor));
+        
+        // Calculate new offsets to zoom towards mouse position
+        const newOffsetX = mouseX - pointXBeforeZoom * newScale;
+        const newOffsetY = mouseY - pointYBeforeZoom * newScale;
+        
+        setScale(newScale);
+        setOffset({
+            x: newOffsetX,
+            y: newOffsetY
+        });
+    }, [scale, offset, minZoom, maxZoom]);
+
+    // Add wheel event listener
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        
+        return () => {
+            canvas.removeEventListener('wheel', handleWheel);
+        };
+    }, [handleWheel]);
+
+    // Redraw canvas when transformations change
+    useEffect(() => {
+        if (!canvasRef.current) return;
+        
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+            // Clear and apply transformations
+            applyTransformations(ctx);
+            
+            // TODO: Redraw all canvas objects here
+            // This would involve drawing each object from canvasObjects
+            // with the current transformations applied
+        }
+    }, [scale, offset, applyTransformations]);
+
     // Handle text and image tool clicks
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         
         const handleCanvasClick = (e: MouseEvent) => {
-            // Skip if we're in selection mode and moving an object
-            if (type === "select" && isMovingObject) {
+            // Skip if we're in selection mode and moving an object or panning
+            if ((type === "select" && isMovingObject) || type === "pan") {
                 return;
             }
             
-            const rect = canvas.getBoundingClientRect();
-            const clickPosition = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            };
+            // Convert screen coordinates to canvas coordinates
+            const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
             
             if (type === "text") {
-                setTextPosition(clickPosition);
+                setTextPosition(canvasCoords);
                 setShowTextInput(true);
                 setTimeout(() => {
                     if (textInputRef.current) {
@@ -191,7 +344,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     }
                 }, 0);
             } else if (type === "image") {
-                setImagePosition(clickPosition);
+                setImagePosition(canvasCoords);
                 if (fileInputRef.current) {
                     fileInputRef.current.click();
                 }
@@ -206,7 +359,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
         
         return undefined;
-    }, [type, isMovingObject]);
+    }, [type, isMovingObject, screenToCanvasCoords]);
     
     // Drawing initialization - with prevention of multiple initializations
     useEffect(() => {
@@ -222,6 +375,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             
             try {
                 // Pass additional parameters for object selection and movement tracking
+                // We need to also pass the transformation functions and state
                 const cleanup = await initDraw(
                     canvas, 
                     roomId, 
@@ -237,7 +391,12 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                         setIsMovingObject(false);
                         setSelectedObjectId(null);
                     },
-                    username
+                    username,
+                    {
+                        scale,
+                        offset,
+                        screenToCanvasCoords: (x: number, y: number) => screenToCanvasCoords(x, y)
+                    }
                 );
                 cleanupFunctionRef.current = cleanup;
             } catch (error) {
@@ -257,54 +416,59 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 cleanupFunctionRef.current = null;
             }
         };
-    }, [roomId, socket, userId, type, selectedColor]);
+    }, [roomId, socket, userId, type, selectedColor, scale, offset, screenToCanvasCoords]);
 
-    // Handle window focus/blur events to prevent drawing issues when switching tabs
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                // Page is hidden (blur), clean up drawing
-                if (cleanupFunctionRef.current) {
-                    cleanupFunctionRef.current();
-                    cleanupFunctionRef.current = null;
-                }
-            } else {
-                // Page is visible again (focus), reinitialize drawing
-                const canvas = canvasRef.current;
-                if (canvas && socket && socket.readyState === WebSocket.OPEN) {
-                    initDraw(
-                        canvas, 
-                        roomId, 
-                        socket, 
-                        userId, 
-                        type, 
-                        selectedColor,
-                        (id: string) => {
-                            setSelectedObjectId(id);
-                            setIsMovingObject(true);
-                        },
-                        () => {
-                            setIsMovingObject(false);
-                            setSelectedObjectId(null);
-                        },
-                        username
-                    )
-                        .then(cleanup => {
-                            cleanupFunctionRef.current = cleanup;
-                        })
-                        .catch(error => {
-                            console.error("Error reinitializing drawing:", error);
-                        });
-                }
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Zoom controls
+    const zoomIn = () => {
+        const newScale = Math.min(maxZoom, scale * 1.2);
+        setScale(newScale);
         
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [roomId, socket, userId, type, selectedColor]);
+        // Adjust offset to keep center point fixed when zooming
+        if (canvasRef.current) {
+            const canvas = canvasRef.current;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Calculate how much the center point moves due to scaling
+            const scaleDiff = newScale - scale;
+            const deltaX = (centerX - offset.x) * (scaleDiff / scale);
+            const deltaY = (centerY - offset.y) * (scaleDiff / scale);
+            
+            // Adjust offset to compensate
+            setOffset({
+                x: offset.x - deltaX,
+                y: offset.y - deltaY
+            });
+        }
+    };
+    
+    const zoomOut = () => {
+        const newScale = Math.max(minZoom, scale / 1.2);
+        setScale(newScale);
+        
+        // Adjust offset to keep center point fixed when zooming
+        if (canvasRef.current) {
+            const canvas = canvasRef.current;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Calculate how much the center point moves due to scaling
+            const scaleDiff = newScale - scale;
+            const deltaX = (centerX - offset.x) * (scaleDiff / scale);
+            const deltaY = (centerY - offset.y) * (scaleDiff / scale);
+            
+            // Adjust offset to compensate
+            setOffset({
+                x: offset.x - deltaX,
+                y: offset.y - deltaY
+            });
+        }
+    };
+    
+    const resetView = () => {
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+    };
 
     const handleTextSubmit = () => {
         if (!textInputRef.current?.value.trim() || !socket || socket.readyState !== WebSocket.OPEN) return;
@@ -461,7 +625,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         { type: "rect", icon: Square, label: "Rectangle" },
         { type: "pencil", icon: Pencil, label: "Pencil" },
         { type: "text", icon: Type, label: "Text" },
-        { type: "image", icon: FileImage, label: "Image" }
+        { type: "image", icon: FileImage, label: "Image" },
+        { type: "pan", icon: Move, label: "Pan" }
     ] as const;
 
     // Handle keyboard events for text input
@@ -497,9 +662,25 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             <div ref={containerRef} className="relative h-screen w-screen overflow-hidden">
                 <canvas 
                     ref={canvasRef} 
-                    className="absolute top-0 left-0 w-full h-full"
-                    // Remove the dark background color - the chalkboard class will provide the background
+                    className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                    // Add cursor style based on selected tool
+                    style={{
+                        cursor: type === 'pan' ? 'grab' : 
+                                isPanning ? 'grabbing' : 
+                                type === 'select' ? 'default' : 'crosshair'
+                    }}
                 />
+
+                {/* AI Drawing Generator Modal */}
+                {showAIDrawingModal && (
+                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                        <AIDrawingGenerator 
+                            roomId={roomId} 
+                            socket={socket} 
+                            onClose={() => setShowAIDrawingModal(false)} 
+                        />
+                    </div>
+                )}
                 
                 {/* Connection status indicator - styled to match chalk theme */}
                 {!isSocketConnected && (
@@ -522,8 +703,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 {showTextInput && (
                     <Card className="absolute z-20 bg-[#1a1a1a] border-[#444444]"
                         style={{
-                            left: textPosition.x,
-                            top: textPosition.y,
+                            left: offset.x + textPosition.x * scale,
+                            top: offset.y + textPosition.y * scale,
                         }}>
                         <CardContent className="p-4">
                             <div className="flex gap-2 mb-2">
@@ -643,37 +824,84 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     </CardContent>
                 </Card>
 
-                {/* Chat toggle button */}
+                {/* Zoom controls panel */}
+                <Card className="absolute right-4 top-1/2 -translate-y-1/2 bg-[#1a1a1a] w-auto z-10 border-[#555555] font-sans">
+                    <CardContent className="flex flex-col gap-2 p-2 justify-center items-center">
+                        <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={zoomIn}
+                            className="w-10 h-10 bg-[#1a1a1a] hover:bg-[#333333] text-[#ffffff]"
+                            aria-label="Zoom in"
+                        >
+                            <ZoomIn className="h-5 w-5" />
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={zoomOut}
+                            className="w-10 h-10 bg-[#1a1a1a] hover:bg-[#333333] text-[#ffffff]"
+                            aria-label="Zoom out"
+                        >
+                            <ZoomOut className="h-5 w-5" />
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={resetView}
+                            className="w-10 h-10 bg-[#1a1a1a] hover:bg-[#333333] text-[#ffffff]"
+                            aria-label="Reset view"
+                        >
+                            <span className="text-xs">Reset</span>
+                        </Button>
+                        <div className="text-[#eeeeee] text-xs mt-1">
+                            {Math.round(scale * 100)}%
+                        </div>
+                         {/* Add AI Drawing Generator button */}
+                         <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={() => setShowAIDrawingModal(true)}
+                            className="w-10 h-10 bg-[#1a1a1a] hover:bg-[#333333] text-yellow-400 mt-2"
+                            aria-label="AI Drawing Generator"
+                        >
+                            <Sparkles className="h-5 w-5" />
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                {/* Chat toggle button with unread message indicator */}
                 <Button
                     variant="secondary"
+                    size="icon"
                     onClick={toggleChat}
-                    className="absolute bottom-2 right-4 z-20 bg-[#333333] hover:bg-[#444444] text-white m-5 mr-0 font-sans"
+                    className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-[#333333] hover:bg-[#444444] text-white z-10"
                     aria-label={isChatVisible ? "Hide chat" : "Show chat"}
                 >
                     {isChatVisible ? (
-                        <MinimizeIcon className="h-4 w-4 mr-1" />
+                        <MinimizeIcon className="h-5 w-5" />
                     ) : (
-                        <>
-                            <MessageCircle className="h-4 w-4 mr-1" />
+                        <div className="relative">
+                            <MessageCircle className="h-5 w-5" />
                             {unreadMessages > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                                     {unreadMessages > 9 ? '9+' : unreadMessages}
                                 </span>
                             )}
-                        </>
+                        </div>
                     )}
-                    {isChatVisible ? "Hide Chat" : "Chat"}
                 </Button>
 
-                {/* Chat section - with toggle functionality and normal text style */}
+                {/* Chat panel */}
                 {isChatVisible && (
-                    <Card className="absolute bottom-10 right-4 w-80 h-96 bg-[#1a1a1a] z-10 border border-[#555555] rounded-md overflow-hidden mb-8">
-                        <CardContent className="p-0 h-full font-sans">
-                            <div className="w-full h-full">
-                                <ChatSection roomId={roomId} socket={socket} />
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="absolute bottom-4 right-20 w-80 z-10 font-sans">
+                        <ChatSection
+                            socket={socket}
+                            roomId={roomId}
+                            userId={userId}
+                            onNewMessage={() => {/* Do nothing, we're already viewing */}}
+                        />
+                    </div>
                 )}
             </div>
         </div>

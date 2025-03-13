@@ -199,7 +199,7 @@ function isPointInShape(x: number, y: number, shape: Shape): { isInside: boolean
 }
 
 export async function initDraw(
-canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, type: string, selectedColor: string = CHALK_COLORS[0], p0: (id: string) => void, p1: () => void, username: string): Promise<() => void> {
+canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, type: string, selectedColor: string = CHALK_COLORS[0], _p0: (id: string) => void, _p1: () => void, username: string, p0: { scale: number; offset: { x: number; y: number; }; screenToCanvasCoords: (x: number, y: number) => { x: number; y: number; }; }): Promise<() => void> {
     let isDrawing = false;
     let isDragging = false;
     let currentShape: Shape | null = null;
@@ -679,68 +679,128 @@ export function clearCanvasAndDrawAll(
 
 // Function to draw the userId on the shape
 function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
-    // Save context for restoring later
-    ctx.save();
-    
-    // Calculate position for the userId text
-    let textX, textY;
-    
-    switch (shape.type) {
-        case "rect":
-        case "image":
-            textX = shape.x + (shape.width / 2);
-            textY = shape.y + (shape.height / 2);
-            break;
-        case "circle":
-            // For circle, find center point
-            const radiusX = Math.abs(shape.clientx - shape.startx) / 2;
-            const radiusY = Math.abs(shape.clienty - shape.starty) / 2;
-            textX = shape.startx + (shape.clientx - shape.startx > 0 ? radiusX : -radiusX);
-            textY = shape.starty + (shape.clienty - shape.starty > 0 ? radiusY : -radiusY);
-            break;
-        case "pencil":
-            // For pencil, find center point of all points
-            let sumX = 0, sumY = 0;
-            shape.points.forEach((point: { x: number; y: number; }) => {
-                sumX += point.x;
-                sumY += point.y;
-            });
-            textX = sumX / shape.points.length;
-            textY = sumY / shape.points.length;
-            break;
-        case "text":
-            textX = shape.x + (ctx.measureText(shape.content).width / 2);
-            textY = shape.y;
-            break;
-        default:
-            textX = 0;
-            textY = 0;
-    }
-    
-    // Set text styling
-    ctx.font = "14px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    
-    // Draw background for better visibility
-    const userId = `User: ${shape.userId}`;
-    const textWidth = ctx.measureText(userId).width;
-    const padding = 5;
-    
-    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-    ctx.fillRect(
-        textX - textWidth/2 - padding, 
-        textY - 10 - padding, 
-        textWidth + (padding * 2), 
-        20 + (padding * 2)
-    );
-    
-    // Draw text
-    ctx.fillStyle = "white";
-    ctx.fillText(userId, textX, textY);
-    
-    // Restore context
-    ctx.restore();
+  // Save context for restoring later
+  ctx.save();
+  
+  // Calculate position for the userId text
+  let textX, textY;
+  switch (shape.type) {
+    case "rect":
+    case "image":
+      textX = shape.x + (shape.width / 2);
+      textY = shape.y + (shape.height / 2);
+      break;
+    case "circle":
+      // For circle, find center point
+      const radiusX = Math.abs(shape.clientx - shape.startx) / 2;
+      const radiusY = Math.abs(shape.clienty - shape.starty) / 2;
+      textX = shape.startx + (shape.clientx - shape.startx > 0 ? radiusX : -radiusX);
+      textY = shape.starty + (shape.clienty - shape.starty > 0 ? radiusY : -radiusY);
+      break;
+    case "pencil":
+      // For pencil, find center point of all points
+      let sumX = 0, sumY = 0;
+      shape.points.forEach((point: { x: number; y: number; }) => {
+        sumX += point.x;
+        sumY += point.y;
+      });
+      textX = sumX / shape.points.length;
+      textY = sumY / shape.points.length;
+      break;
+    case "text":
+      textX = shape.x + (ctx.measureText(shape.content).width / 2);
+      textY = shape.y;
+      break;
+    default:
+      textX = 0;
+      textY = 0;
+  }
+  
+  // Ensure coordinates are integers for crisp rendering
+  textX = Math.round(textX);
+  textY = Math.round(textY);
+  
+  // Format the user ID
+  const userId = `@${shape.userId}`;
+  
+  // Set text styling with a more modern font stack
+  ctx.font = "500 14px 'SF Pro Display', 'Inter', system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  
+  // Calculate text dimensions
+  const textMetrics = ctx.measureText(userId);
+  const textWidth = textMetrics.width;
+  const textHeight = 14; // Approximate height based on font size
+  
+  // Define modern styling with reduced padding for a sleeker look
+  const paddingX = 12;
+  const paddingY = 8;
+  const borderRadius = 12; // Slightly reduced for a more modern look
+  
+  // Calculate rectangle dimensions and position
+  const rectWidth = textWidth + (paddingX * 2);
+  const rectHeight = textHeight + (paddingY * 2);
+  const rectX = textX - (rectWidth / 2);
+  const rectY = textY - (rectHeight / 2);
+  
+  // Generate a vibrant but dark color suitable for a blackish canvas
+  // Using HSL for better control over luminosity
+  const hue = Math.floor(Math.random() * 360); // Random hue (0-359)
+  const saturation = 70 + Math.floor(Math.random() * 30); // High saturation (70-99%)
+  const lightness = 40 + Math.floor(Math.random() * 15); // Medium-low lightness (40-54%)
+  const badgeColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  
+  // Add subtle glow effect instead of shadow
+  ctx.shadowColor = `hsla(${hue}, ${saturation}%, ${lightness + 20}%, 0.4)`;
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  
+  // Draw pill-shaped badge (fully rounded rectangle)
+  ctx.beginPath();
+  const arcRadius = rectHeight / 2; // Make it pill-shaped
+  
+  // Draw the pill shape
+  ctx.moveTo(rectX + arcRadius, rectY);
+  ctx.lineTo(rectX + rectWidth - arcRadius, rectY);
+  ctx.arcTo(rectX + rectWidth, rectY, rectX + rectWidth, rectY + arcRadius, arcRadius);
+  ctx.lineTo(rectX + rectWidth, rectY + rectHeight - arcRadius);
+  ctx.arcTo(rectX + rectWidth, rectY + rectHeight, rectX + rectWidth - arcRadius, rectY + rectHeight, arcRadius);
+  ctx.lineTo(rectX + arcRadius, rectY + rectHeight);
+  ctx.arcTo(rectX, rectY + rectHeight, rectX, rectY + rectHeight - arcRadius, arcRadius);
+  ctx.lineTo(rectX, rectY + arcRadius);
+  ctx.arcTo(rectX, rectY, rectX + arcRadius, rectY, arcRadius);
+  ctx.closePath();
+  
+  // Add gradient fill for a more modern look
+  const gradient = ctx.createLinearGradient(rectX, rectY, rectX, rectY + rectHeight);
+  gradient.addColorStop(0, badgeColor);
+  gradient.addColorStop(1, `hsl(${(hue + 20) % 360}, ${saturation}%, ${Math.max(25, lightness - 15)}%)`);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  
+  // Add subtle inner border
+  ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness + 15}%, 0.6)`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  
+  // Reset shadow settings before drawing text
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  
+  // Draw text in white with subtle text shadow for better readability
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillText(userId, textX, textY);
+  
+  // Restore context
+  ctx.restore();
 }
 
 
