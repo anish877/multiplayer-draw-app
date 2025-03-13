@@ -16,7 +16,8 @@ type Shape = {
     height: number;
     color?: string;
     id?: string;
-    iseditable: boolean
+    iseditable: boolean;
+    userId: string
 } | {
     type: "circle";
     startx: number;
@@ -25,13 +26,15 @@ type Shape = {
     clienty: number;
     color?: string;
     id?: string;
-    iseditable: boolean
+    iseditable: boolean;
+    userId: string
 } | {
     type: "pencil";
     points: Point[];
     color?: string;
     id?: string;
-    iseditable: boolean
+    iseditable: boolean;
+    userId: string
 } | {
     type: "text";
     x: number;
@@ -44,7 +47,8 @@ type Shape = {
         isBold: boolean;
         isItalic: boolean;
     };
-    iseditable: boolean
+    iseditable: boolean;
+    userId: string
 } | {
     type: "image";
     x: number;
@@ -53,7 +57,8 @@ type Shape = {
     height: number;
     src: string;
     id?: string;
-    iseditable: boolean
+    iseditable: boolean;
+    userId: string
 };
 
 const CHALK_COLORS = [
@@ -66,6 +71,10 @@ const CHALK_COLORS = [
     '#3165f5', // blue
     '#9e31f5', // purple
 ];
+
+// Add these to your state variables
+let showingUserId: Shape | null = null; // Will store the shape we're showing the userId for
+let userIdTimeout: string | number | NodeJS.Timeout | null | undefined = null; // For clearing the timeout when needed
 
 // Add isPointInImage function for selection
 function isPointInImage(x: number, y: number, image: Extract<Shape, {type: "image"}>): boolean {
@@ -158,36 +167,39 @@ function drawImage(shape: Extract<Shape, {type: "image"}>, ctx: CanvasRenderingC
     };
 }
 
-// Update the isPointInShape function to include image type
-function isPointInShape(x: number, y: number, shape: Shape): boolean {
-    if(shape.iseditable){
-        switch (shape.type) {
-            case "rect":
-                return isPointInRect(x, y, shape);
-            case "circle":
-                return isPointInCircle(x, y, shape);
-            case "pencil":
-                return isPointInPencil(x, y, shape);
-            case "text":
-                return isPointInText(x, y, shape);
-            case "image":
-                return isPointInImage(x, y, shape);
-            default:
-                return false;
-        }
-    } else {
-        return false;
+function isPointInShape(x: number, y: number, shape: Shape): { isInside: boolean, isEditable: boolean } {
+    console.log(shape);
+    
+    let isInside = false;
+    
+    switch (shape.type) {
+        case "rect":
+            isInside = isPointInRect(x, y, shape);
+            break;
+        case "circle":
+            isInside = isPointInCircle(x, y, shape);
+            break;
+        case "pencil":
+            isInside = isPointInPencil(x, y, shape);
+            break;
+        case "text":
+            isInside = isPointInText(x, y, shape);
+            break;
+        case "image":
+            isInside = isPointInImage(x, y, shape);
+            break;
+        default:
+            isInside = false;
     }
+    
+    return { 
+        isInside: isInside,
+        isEditable: shape.iseditable 
+    };
 }
 
 export async function initDraw(
-    canvas: HTMLCanvasElement, 
-    roomId: string, 
-    socket: WebSocket, 
-    userId: string, 
-    type: string, 
-    selectedColor: string = CHALK_COLORS[0]
-): Promise<() => void> {
+canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, type: string, selectedColor: string = CHALK_COLORS[0], p0: (id: string) => void, p1: () => void, username: string): Promise<() => void> {
     let isDrawing = false;
     let isDragging = false;
     let currentShape: Shape | null = null;
@@ -284,40 +296,69 @@ export async function initDraw(
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
+    
+        // Clear any existing userId display timeout
+        if (userIdTimeout) {
+            clearTimeout(userIdTimeout);
+            userIdTimeout = null;
+        }
+        showingUserId = null;
+    
         // Check if we're clicking on an existing shape, but only in select mode
         if (type === "select") {
             let found = false;
             // Iterate in reverse to select the topmost shape first
             for (let i = existingShapes.length - 1; i >= 0; i--) {
                 const shape = existingShapes[i];
-                if (isPointInShape(x, y, shape)) {
-                    selectedShape = shape;
-                    // Store original shape for deletion
-                    oldSelectedShape = JSON.parse(JSON.stringify(shape));
-                    isDragging = true;
+                const result = isPointInShape(x, y, shape);
+                
+                if (result.isInside) {
                     found = true;
                     
-                    // Calculate drag offset
-                    if (shape.type === "rect" || shape.type === "image") {
-                        dragOffsetX = x - shape.x;
-                        dragOffsetY = y - shape.y;
-                    } else if (shape.type === "circle") {
-                        const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
-                        const centerY = shape.starty + (shape.clienty - shape.starty) * 0.5;
-                        dragOffsetX = x - centerX;
-                        dragOffsetY = y - centerY;
-                    } else if (shape.type === "pencil") {
-                        let minX = Infinity, minY = Infinity;
-                        shape.points.forEach(point => {
-                            minX = Math.min(minX, point.x);
-                            minY = Math.min(minY, point.y);
-                        });
-                        dragOffsetX = x - minX;
-                        dragOffsetY = y - minY;
-                    } else if (shape.type === "text") {
-                        dragOffsetX = x - shape.x;
-                        dragOffsetY = y - shape.y;
+                    if (result.isEditable) {
+                        // Handle editable shape (existing code)
+                        selectedShape = shape;
+                        // Store original shape for deletion
+                        oldSelectedShape = JSON.parse(JSON.stringify(shape));
+                        isDragging = true;
+                        
+                        // Calculate drag offset
+                        if (shape.type === "rect" || shape.type === "image") {
+                            dragOffsetX = x - shape.x;
+                            dragOffsetY = y - shape.y;
+                        } else if (shape.type === "circle") {
+                            const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
+                            const centerY = shape.starty + (shape.clienty - shape.starty) * 0.5;
+                            dragOffsetX = x - centerX;
+                            dragOffsetY = y - centerY;
+                        } else if (shape.type === "pencil") {
+                            let minX = Infinity, minY = Infinity;
+                            shape.points.forEach(point => {
+                                minX = Math.min(minX, point.x);
+                                minY = Math.min(minY, point.y);
+                            });
+                            dragOffsetX = x - minX;
+                            dragOffsetY = y - minY;
+                        } else if (shape.type === "text") {
+                            dragOffsetX = x - shape.x;
+                            dragOffsetY = y - shape.y;
+                        }
+                    } else {
+                        // Show userId for non-editable shape directly on canvas
+                        selectedShape = null;
+                        oldSelectedShape = null;
+                        isDragging = false;
+                        
+                        // Display userId on the shape
+                        if (shape.userId) {
+                            showingUserId = shape;
+                            
+                            // Set a timeout to hide the userId after a few seconds
+                            userIdTimeout = setTimeout(() => {
+                                showingUserId = null;
+                                clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
+                            }, 3000); // Show for 3 seconds
+                        }
                     }
                     
                     clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
@@ -345,7 +386,8 @@ export async function initDraw(
                     points: [{x, y}],
                     color: selectedColor,
                     id: generateId(),
-                    iseditable: true
+                    iseditable: true,
+                    userId: username
                 };
                 break;
             case "rect":
@@ -357,7 +399,8 @@ export async function initDraw(
                     height: 0,
                     color: selectedColor,
                     id: generateId(),
-                    iseditable: true
+                    iseditable: true,
+                    userId: username
                 };
                 break;
             case "circle":
@@ -369,7 +412,8 @@ export async function initDraw(
                     clienty: y,
                     color: selectedColor,
                     id: generateId(),
-                    iseditable: true
+                    iseditable: true,
+                    userId: username
                 };
                 break;
             case "text":
@@ -385,7 +429,8 @@ export async function initDraw(
                         isBold: false,
                         isItalic: false
                     },
-                    iseditable: true
+                    iseditable: true,
+                    userId: username
                 };
                 
                 // Show a prompt to enter text
@@ -597,7 +642,7 @@ export async function initDraw(
     };
 }
 
-// New function that handles both existing shapes and the current shape being drawn
+// New modified function that includes drawing userId text
 export function clearCanvasAndDrawAll(
     existingShapes: Shape[], 
     canvas: HTMLCanvasElement, 
@@ -625,7 +670,79 @@ export function clearCanvasAndDrawAll(
         drawSelectionIndicator(selectedShape, ctx);
         drawShape(selectedShape, ctx, roughCanvas);
     }
+    
+    // Draw userId if we are showing it
+    if (showingUserId) {
+        drawUserId(showingUserId, ctx);
+    }
 }
+
+// Function to draw the userId on the shape
+function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
+    // Save context for restoring later
+    ctx.save();
+    
+    // Calculate position for the userId text
+    let textX, textY;
+    
+    switch (shape.type) {
+        case "rect":
+        case "image":
+            textX = shape.x + (shape.width / 2);
+            textY = shape.y + (shape.height / 2);
+            break;
+        case "circle":
+            // For circle, find center point
+            const radiusX = Math.abs(shape.clientx - shape.startx) / 2;
+            const radiusY = Math.abs(shape.clienty - shape.starty) / 2;
+            textX = shape.startx + (shape.clientx - shape.startx > 0 ? radiusX : -radiusX);
+            textY = shape.starty + (shape.clienty - shape.starty > 0 ? radiusY : -radiusY);
+            break;
+        case "pencil":
+            // For pencil, find center point of all points
+            let sumX = 0, sumY = 0;
+            shape.points.forEach((point: { x: number; y: number; }) => {
+                sumX += point.x;
+                sumY += point.y;
+            });
+            textX = sumX / shape.points.length;
+            textY = sumY / shape.points.length;
+            break;
+        case "text":
+            textX = shape.x + (ctx.measureText(shape.content).width / 2);
+            textY = shape.y;
+            break;
+        default:
+            textX = 0;
+            textY = 0;
+    }
+    
+    // Set text styling
+    ctx.font = "14px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    
+    // Draw background for better visibility
+    const userId = `User: ${shape.userId}`;
+    const textWidth = ctx.measureText(userId).width;
+    const padding = 5;
+    
+    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.fillRect(
+        textX - textWidth/2 - padding, 
+        textY - 10 - padding, 
+        textWidth + (padding * 2), 
+        20 + (padding * 2)
+    );
+    
+    // Draw text
+    ctx.fillStyle = "white";
+    ctx.fillText(userId, textX, textY);
+    
+    // Restore context
+    ctx.restore();
+}
+
 
 // Keep the original clearCanvas for compatibility
 export function clearCanvas(

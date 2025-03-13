@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,23 +7,23 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 7%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 240 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 80%;
 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
@@ -30,179 +31,123 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 100%;
 
     --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-chalkboard text-chalk-white font-hand overflow-x-hidden;
+    @apply bg-chalkboard bg-chalkboard-texture text-chalk-white font-chalk antialiased;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow-x: hidden;
   }
 }
 
-/* Chalk text effect */
 @layer components {
-  .chalk-text {
-    text-shadow: 0px 0px 1px rgba(255, 255, 255, 0.6), 
-                 0px 0px 3px rgba(255, 255, 255, 0.3);
-    @apply opacity-90;
-  }
-  
-  .chalk-text-yellow {
-    text-shadow: 0px 0px 1px rgba(255, 249, 196, 0.6), 
-                 0px 0px 3px rgba(255, 249, 196, 0.3);
-    @apply text-chalk-yellow opacity-90;
-  }
-  
-  .chalk-text-blue {
-    text-shadow: 0px 0px 1px rgba(187, 222, 251, 0.6), 
-                 0px 0px 3px rgba(187, 222, 251, 0.3);
-    @apply text-chalk-blue opacity-90;
-  }
-  
-  .chalk-text-pink {
-    text-shadow: 0px 0px 1px rgba(248, 187, 208, 0.6), 
-                 0px 0px 3px rgba(248, 187, 208, 0.3);
-    @apply text-chalk-pink opacity-90;
+  .chalk-heading {
+    @apply relative font-chalk font-bold tracking-wide text-chalk-white;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
   }
 
-  .chalk-stroke {
-    @apply relative;
+  .chalk-text {
+    @apply font-chalk text-chalk-white opacity-90;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.2);
   }
-  
-  .chalk-stroke::after {
-    content: "";
-    @apply absolute top-0 left-0 w-full h-full;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+
+  .chalk-dust {
+    @apply absolute w-1 h-1 rounded-full bg-white opacity-0;
   }
-  
-  .chalk-border {
-    @apply border border-opacity-30 border-white shadow-chalk;
-  }
-  
-  /* Chalkboard texture */
-  .chalkboard {
-    background-color: #1A2E22;
-    background-image: 
-      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px;
+
+  .chalk-container {
     position: relative;
   }
-  
-  .chalkboard::before {
+
+  .chalk-container::before {
     content: "";
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    z-index: -1;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .chalk-container:hover::before {
+    opacity: 1;
+  }
+
+  .chalk-button {
+    @apply relative inline-flex items-center justify-center px-6 py-3 overflow-hidden font-chalk font-medium tracking-tighter text-white bg-transparent border-2 border-white rounded-md;
+    /* The group class needs to be applied directly in HTML, not via @apply */
+  }
+
+  .chalk-button::before {
+    @apply content-[''] absolute top-0 left-0 w-full h-0 transition-all duration-500 ease-out bg-white opacity-10;
+  }
+
+  .chalk-button:hover::before {
+    @apply h-full;
+  }
+
+  .chalk-button::after {
+    content: '';
+    background-image: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%);
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  }
+
+  .chalk-button:hover::after {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  /* Chalk dust animation */
+  .chalk-dust-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Chalk stroke SVG */
+  .chalk-stroke-svg {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 100%);
+    z-index: -1;
     pointer-events: none;
   }
-  
-  /* Animation delay utilities */
-  .delay-100 {
-    animation-delay: 0.1s;
-  }
-  
-  .delay-200 {
-    animation-delay: 0.2s;
-  }
-  
-  .delay-300 {
-    animation-delay: 0.3s;
-  }
-  
-  .delay-400 {
-    animation-delay: 0.4s;
-  }
-  
-  .delay-500 {
-    animation-delay: 0.5s;
-  }
-  
-  .delay-600 {
-    animation-delay: 0.6s;
-  }
-  
-  .delay-700 {
-    animation-delay: 0.7s;
-  }
-  
-  .delay-800 {
-    animation-delay: 0.8s;
-  }
-  
-  .delay-900 {
-    animation-delay: 0.9s;
-  }
-  
-  .delay-1000 {
-    animation-delay: 1s;
-  }
-  
-  .delay-1500 {
-    animation-delay: 1.5s;
-  }
-  
-  .delay-2000 {
-    animation-delay: 2s;
+
+  .chalk-stroke-path {
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 1;
+    fill: none;
+    stroke-dasharray: 100%;
+    stroke-dashoffset: 100%;
   }
 }

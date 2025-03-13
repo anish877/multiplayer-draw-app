@@ -1,221 +1,182 @@
 'use client';
-import { useEffect } from 'react';
-import ChalkHeading from '@/components/ChalkHeading';
-import ChalkText from '@/components/ChalkText';
-import ChalkButton from '@/components/ChalkButton';
-import ChalkDrawing from '@/components/ChalkDrawing';
-import FeatureCard from '@/components/FeatureCard';
-import Footer from '@/components/Footer';
-import AnimatedChalkDust from '@/components/AnimatedChalkDust';
+import { JSX, useEffect, useState } from "react";
+import Link from "next/link";
+import ChalkHeading from "@/components/ChalkHeading";
+import ChalkButton from "@/components/ChalkButton";
+import ChalkFeature from "@/components/ChalkFeature";
+import ChalkDrawing from "@/components/ChalkDrawing";
 import { 
   Pencil, 
-  MessageCircle, 
-  Bot, 
-  Maximize, 
+  MessageSquare, 
+  Bot,
+  Image, 
   Lock, 
-  Users,
-  RefreshCw
-} from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
+  Github, 
+  Twitter, 
+  Instagram, 
+  Youtube 
+} from "lucide-react";
 
 const Index = () => {
+  const [dustElements, setDustElements] = useState<JSX.Element[]>([]);
+  const [scrollY, setScrollY] = useState(0);
+
+  // Generate chalk dust particles on scroll
   useEffect(() => {
-    // Simulate chalk dust on page load
-    setTimeout(() => {
-      toast("Welcome to Sketch & Chat!", {
-        description: "Where your ideas come to life!",
-        duration: 3000,
-      });
-    }, 1000);
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+      
+      if (Math.random() > 0.7) {
+        const newDust = (
+          <div
+            key={Date.now()}
+            className="chalk-dust animate-chalk-dust"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDuration: `${1 + Math.random() * 2}s`,
+              width: `${1 + Math.random() * 2}px`,
+              height: `${1 + Math.random() * 2}px`,
+            }}
+          />
+        );
+        
+        setDustElements(prev => [...prev, newDust]);
+        
+        // Remove dust after animation completes
+        setTimeout(() => {
+          setDustElements(prev => prev.slice(1));
+        }, 3000);
+      }
+    };
+    
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleStartSketchingClick = () => {
-    toast("Coming Soon!", {
-      description: "We're still drawing up this feature. Stay tuned!",
-      duration: 3000,
-    });
-  };
-
-  // Feature data
-  const features = [
-    {
-      title: "Real-time Multiplayer Drawing",
-      description: "Sketch together from anywhere in the world with real-time collaborative drawing tools.",
-      icon: <Pencil className="w-8 h-8 text-chalk-white" />,
-      color: 'white',
-      delay: 'delay-300'
-    },
-    {
-      title: "Live Chat While You Draw",
-      description: "Communicate seamlessly with friends & teams as you create together.",
-      icon: <MessageCircle className="w-8 h-8 text-chalk-yellow" />,
-      color: 'yellow',
-      delay: 'delay-400'
-    },
-    {
-      title: "AI-Powered Figure Generation",
-      description: "Just type a prompt, and AI creates sketches for you in seconds.",
-      icon: <Bot className="w-8 h-8 text-chalk-blue" />,
-      color: 'blue',
-      delay: 'delay-500'
-    },
-    {
-      title: "Infinite Canvas",
-      description: "Explore endless creativity with a never-ending board that grows with your ideas.",
-      icon: <Maximize className="w-8 h-8 text-chalk-pink" />,
-      color: 'pink',
-      delay: 'delay-600'
-    },
-    {
-      title: "Secure & Private",
-      description: "Your sketches, your rules. We prioritize the privacy and security of your creations.",
-      icon: <Lock className="w-8 h-8 text-chalk-white" />,
-      color: 'white',
-      delay: 'delay-700'
-    },
-    {
-      title: "Multiplayer Collaboration",
-      description: "Invite friends, family or colleagues to join your creative sessions.",
-      icon: <Users className="w-8 h-8 text-chalk-yellow" />,
-      color: 'yellow',
-      delay: 'delay-800'
-    }
-  ];
-
   return (
-    <div className="min-h-screen chalkboard overflow-hidden">
-      {/* Header Section */}
-      <header className="container mx-auto pt-8 px-4 sm:pt-12 md:pt-16">
-        <div className="text-center relative">
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
-            <AnimatedChalkDust intensity="medium" />
+    <div className="relative min-h-screen">
+      {/* Chalk dust container */}
+      <div className="chalk-dust-container">
+        {dustElements}
+      </div>
+
+      {/* Header */}
+      <header className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <nav className="flex justify-between items-center mb-12 sm:mb-16">
+          <div className="font-chalk text-2xl sm:text-3xl font-bold tracking-wider">Sketch Board</div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link href="/auth/login">
+              <ChalkButton variant="outline" className="px-4 sm:px-6 py-2">Log In</ChalkButton>
+            </Link>
+            <Link href="/auth/signup">
+              <ChalkButton variant="blue" className="px-4 sm:px-6 py-2">Sign Up</ChalkButton>
+            </Link>
           </div>
-          <ChalkHeading 
-            className="text-4xl sm:text-5xl md:text-6xl mb-3" 
-            delay="delay-200"
-          >
-            Sketch & Chat
-          </ChalkHeading>
-          <ChalkHeading 
-            level={2} 
-            className="text-xl sm:text-2xl md:text-3xl mb-2" 
-            color="yellow"
-            delay="delay-400"
-          >
-            Where Ideas Come to Life
-          </ChalkHeading>
-          <ChalkText 
-            className="max-w-xl mx-auto text-lg opacity-80" 
-            delay="delay-600"
-          >
-            Collaborate, Draw, Chat & Let AI Bring Your Imagination to Reality
-          </ChalkText>
-        </div>
+        </nav>
+
+        {/* Hero Section */}
+        <section className="py-12 sm:py-16 flex flex-col md:flex-row items-center gap-8 sm:gap-12">
+          <div className="flex-1 text-center md:text-left">
+            <div className="inline-block px-3 py-1 mb-4 sm:mb-6 border border-chalk-gray/30 rounded-full">
+              <span className="font-handwriting text-chalk-blue">Collaborative Drawing Platform</span>
+            </div>
+            <ChalkHeading as="h1" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-4 sm:mb-6">
+              Sketch & Chat – Where Ideas Come to Life
+            </ChalkHeading>
+            <p className="font-handwriting text-lg sm:text-xl text-chalk-gray mb-6 sm:mb-8 max-w-xl mx-auto md:mx-0">
+              Collaborate, Draw, Chat & Let AI Bring Your Imagination to Reality
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+              <Link href="/auth/signup">
+                <ChalkButton className="px-6 py-3">Start Sketching Now</ChalkButton>
+              </Link>
+              <ChalkButton variant="outline" className="px-6 py-3">Learn More</ChalkButton>
+            </div>
+          </div>
+          <div className="flex-1 relative">
+            <ChalkDrawing />
+          </div>
+        </section>
       </header>
 
-      {/* Hero Section */}
-      <section className="container mx-auto mt-8 md:mt-12 px-4 flex flex-col md:flex-row items-center justify-between gap-10">
-        <div className="md:w-1/2 text-center md:text-left">
-          <ChalkText 
-            className="text-lg sm:text-xl mb-8" 
-            color="blue"
-            delay="delay-800"
-          >
-            Unleash your creativity in a collaborative space where drawing, 
-            communication, and AI converge. Perfect for teams, classrooms, 
-            and creative minds everywhere.
-          </ChalkText>
-          <Link href={"/auth/login"}>
-            <ChalkButton 
-              color="yellow" 
-              className="text-xl px-10 py-4 transform hover:scale-105"
-              onClick={handleStartSketchingClick}
-              delay="delay-1000"
-            >
-              Start Sketching Now
-            </ChalkButton>
-          </Link>
-          
-        </div>
-        
-        <div className="md:w-1/2 relative">
-          <div className="w-full max-w-md mx-auto md:mx-0">
-            <ChalkDrawing className="w-full h-auto" />
-          </div>
-          
-          {/* Floating elements to enhance the chalk effect */}
-          <div className="absolute -right-8 top-10 opacity-20 animate-float">
-            <RefreshCw className="w-12 h-12 text-chalk-white" />
-          </div>
-          <div className="absolute -left-8 bottom-10 opacity-20 animate-float delay-1000">
-            <Pencil className="w-10 h-10 text-chalk-yellow" />
-          </div>
-        </div>
-      </section>
-
       {/* Features Section */}
-      <section className="container mx-auto mt-16 md:mt-24 px-4 py-8">
-        <ChalkHeading 
-          level={2} 
-          className="text-3xl md:text-4xl text-center mb-12"
-          delay="delay-200"
-        >
-          Drawn With <span className="text-chalk-pink">Passion</span>, Powered By <span className="text-chalk-blue">Innovation</span>
+      <section className="container mx-auto px-4 sm:px-6 py-16 sm:py-24" id="features">
+        <ChalkHeading className="text-3xl sm:text-4xl md:text-5xl text-center mb-12 sm:mb-16">
+          The Digital Chalkboard, Reimagined
         </ChalkHeading>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
-            <FeatureCard
-              key={index}
-              title={feature.title}
-              description={feature.description}
-              icon={feature.icon}
-              color={feature.color as 'white' | 'yellow' | 'blue' | 'pink'}
-              delay={feature.delay}
-            />
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          <ChalkFeature
+            icon={Pencil}
+            title="Real-time Multiplayer Drawing"
+            description="Sketch together in real-time with friends, colleagues, or clients - no matter where they are."
+            index={0}
+          />
+          <ChalkFeature
+            icon={MessageSquare}
+            title="Live Chat While You Draw"
+            description="Communicate ideas instantly with integrated chat functionality while collaborating on the canvas."
+            index={1}
+          />
+          <ChalkFeature
+            icon={Bot}
+            title="AI-Powered Figure Generation"
+            description="Type a prompt, and watch as AI sketches it instantly on your canvas - perfect for quick visualizations."
+            iconColor="text-chalk-blue"
+            index={2}
+          />
+          <ChalkFeature
+            icon={Image}
+            title="Infinite Canvas"
+            description="No boundaries to your creativity with a limitless drawing space that grows with your ideas."
+            index={3}
+          />
+          <ChalkFeature
+            icon={Lock}
+            title="Secure & Private"
+            description="Your sketches, your control. Strong privacy features ensure your work stays with those you choose to share it with."
+            index={4}
+          />
+          <ChalkFeature
+            title="Cross-Platform Compatibility"
+            description="Draw from any device with a browser - desktop, tablet, or mobile. Your canvas syncs seamlessly across all devices."
+            index={5}
+          />
         </div>
       </section>
 
-      {/* Call to Action */}
-      <section className="container mx-auto mt-16 md:mt-24 px-4 text-center py-10 relative">
-        <div className="max-w-2xl mx-auto relative">
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
-            <AnimatedChalkDust intensity="low" />
-          </div>
-          
-          <ChalkHeading 
-            level={2} 
-            className="text-2xl md:text-3xl mb-6"
-            color="blue"
-            delay="delay-200"
-          >
-            Ready to Transform Your Ideas Into Visual Reality?
-          </ChalkHeading>
-          
-          <ChalkText 
-            className="mb-8 opacity-80"
-            delay="delay-400"
-          >
-            Join thousands of creative minds already sketching, chatting, and creating together.
-          </ChalkText>
-          
-          <ChalkButton 
-            onClick={handleStartSketchingClick}
-            delay="delay-600"
-          >
-            Join the Creative Community
-          </ChalkButton>
-        </div>
+      {/* CTA Section */}
+      <section className="container mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
+        <ChalkHeading className="text-3xl sm:text-4xl md:text-5xl mb-6 sm:mb-8">Ready to Start Sketching?</ChalkHeading>
+        <p className="font-handwriting text-lg sm:text-xl text-chalk-gray mb-8 max-w-xl mx-auto">
+          Join thousands of creative minds already bringing their ideas to life
+        </p>
+        <ChalkButton variant="blue" className="text-lg sm:text-xl px-6 sm:px-8 py-3 sm:py-4">
+          Try It For Free
+        </ChalkButton>
       </section>
 
       {/* Footer */}
-      <Footer className="mt-16" />
+      <footer className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 border-t border-white/10">
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <div className="mb-6 md:mb-0">
+            <div className="font-chalk text-xl sm:text-2xl font-bold tracking-wider mb-2">Sketch Board</div>
+            <p className="font-handwriting text-chalk-gray">Built with ❤️ by creative minds for creative minds</p>
+          </div>
+          <div className="flex gap-4 sm:gap-6">
+            <Github className="w-5 h-5 sm:w-6 sm:h-6 text-chalk-gray hover:text-chalk-white transition-colors" />
+            <Twitter className="w-5 h-5 sm:w-6 sm:h-6 text-chalk-gray hover:text-chalk-white transition-colors" />
+            <Instagram className="w-5 h-5 sm:w-6 sm:h-6 text-chalk-gray hover:text-chalk-white transition-colors" />
+            <Youtube className="w-5 h-5 sm:w-6 sm:h-6 text-chalk-gray hover:text-chalk-white transition-colors" />
+          </div>
+        </div>
+        <div className="text-center mt-8 sm:mt-12">
+          <p className="font-handwriting text-chalk-gray text-sm">© {new Date().getFullYear()} Sketch Board. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 };
 
 export default Index;
-
-

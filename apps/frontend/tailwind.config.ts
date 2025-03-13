@@ -18,6 +18,10 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				chalk: ['Caveat', 'cursive'],
+				handwriting: ['Architects Daughter', 'cursive'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -25,15 +29,14 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				chalkboard: {
-					dark: '#1A2E22',
-					DEFAULT: '#1E3629',
-					light: '#264331',
+					DEFAULT: '#121212',
+					dark: '#0A0A0A',
+					light: '#1E1E1E',
 				},
 				chalk: {
-					white: '#F5F5F5',
-					yellow: '#FFF9C4',
-					blue: '#BBDEFB',
-					pink: '#F8BBD0',
+					white: '#FFFFFF',
+					gray: '#C8C8C9',
+					blue: '#D3E4FD',
 				},
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
@@ -74,10 +77,6 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
-			fontFamily: {
-				chalk: ['Chalk', 'cursive'],
-				hand: ['Caveat', 'cursive'],
-			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
@@ -92,63 +91,59 @@ export default {
 					from: { height: 'var(--radix-accordion-content-height)' },
 					to: { height: '0' }
 				},
-				'chalk-write': {
+				'chalk-draw': {
+					'0%': { 
+						strokeDashoffset: '100%',
+						opacity: '0.2'
+					},
+					'100%': {
+						strokeDashoffset: '0%',
+						opacity: '1'
+					}
+				},
+				'chalk-fade-in': {
 					'0%': { 
 						opacity: '0',
 						transform: 'translateY(10px)'
 					},
-					'100%': { 
+					'100%': {
 						opacity: '1',
-						transform: 'translateY(0)' 
+						transform: 'translateY(0)'
 					}
 				},
 				'chalk-dust': {
 					'0%': { 
 						opacity: '0',
-						transform: 'scale(0.9)' 
+						transform: 'translateY(0) scale(1)'
 					},
-					'50%': { 
-						opacity: '0.6' 
-					},
-					'100%': { 
-						opacity: '0',
-						transform: 'scale(1.1) translateY(10px)' 
-					}
-				},
-				'float': {
-					'0%, 100%': { 
-						transform: 'translateY(0)' 
-					},
-					'50%': { 
-						transform: 'translateY(-10px)' 
-					}
-				},
-				'chalk-erase': {
-					'0%': { 
-						opacity: '1' 
-					},
-					'50%': { 
+					'50%': {
 						opacity: '0.5',
-						transform: 'translateX(5px)'
+						transform: 'translateY(-10px) scale(1.5)'
 					},
-					'100%': { 
-						opacity: '1' 
+					'100%': {
+						opacity: '0',
+						transform: 'translateY(-20px) scale(1)'
+					}
+				},
+				'chalk-smudge': {
+					'0%': { 
+						backgroundPosition: '0% 0%'
+					},
+					'100%': {
+						backgroundPosition: '100% 0%'
 					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'chalk-write': 'chalk-write 0.8s ease-out forwards',
-				'chalk-dust': 'chalk-dust 1.5s ease-out forwards',
-				'float': 'float 6s ease-in-out infinite',
-				'chalk-erase': 'chalk-erase 0.3s ease-out'
-			},
-			boxShadow: {
-				'chalk': '2px 2px 0px 0px rgba(255, 255, 255, 0.1)',
+				'chalk-draw': 'chalk-draw 1.5s ease-out forwards',
+				'chalk-fade-in': 'chalk-fade-in 0.5s ease-out forwards',
+				'chalk-dust': 'chalk-dust 2s ease-out infinite',
+				'chalk-smudge': 'chalk-smudge 0.3s ease-out forwards'
 			},
 			backgroundImage: {
-				'chalkboard': "url('/chalkboard-texture.png')",
+				'chalkboard-texture': "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgb3BhY2l0eT0iMC4xIj48cmVjdCB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiMxMjEyMTIiLz48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSIxIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMC41IiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSI0MCIgcj0iMC43NSIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iMTUiIHI9IjAuNCIgZmlsbD0iI0ZGRkZGRiIvPjwvc3ZnPg==')",
 			}
 		}
 	},

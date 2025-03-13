@@ -48,6 +48,12 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     // Chat toggle state
     const [isChatVisible, setIsChatVisible] = useState(true);
     const [unreadMessages, setUnreadMessages] = useState(0);
+    // Track objects on canvas to prevent duplications
+    const [canvasObjects, setCanvasObjects] = useState<{[id: string]: any}>({});
+    // Track when an object is being moved
+    const [isMovingObject, setIsMovingObject] = useState(false);
+    const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+    const {username} = useAuth()
 
     // Socket event listener
     useEffect(() => {
@@ -61,6 +67,36 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 } else if (data.type === 'chat_message' && !isChatVisible) {
                     // Increment unread count if chat is hidden
                     setUnreadMessages(prev => prev + 1);
+                } else if (data.type === 'canvas_update') {
+                    // Track objects being added to the canvas
+                    try {
+                        const canvasData = JSON.parse(data.message);
+                        if (canvasData.id) {
+                            setCanvasObjects(prev => ({
+                                ...prev,
+                                [canvasData.id]: canvasData
+                            }));
+                        }
+                    } catch (err) {
+                        console.error('Error parsing canvas update:', err);
+                    }
+                } else if (data.type === 'move_object') {
+                    // Handle object movement updates
+                    try {
+                        const moveData = JSON.parse(data.message);
+                        if (moveData.id) {
+                            setCanvasObjects(prev => ({
+                                ...prev,
+                                [moveData.id]: {
+                                    ...prev[moveData.id],
+                                    x: moveData.x,
+                                    y: moveData.y
+                                }
+                            }));
+                        }
+                    } catch (err) {
+                        console.error('Error parsing move update:', err);
+                    }
                 }
             } catch (error) {
                 console.error('Error parsing message:', error);
@@ -135,6 +171,11 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         if (!canvas) return;
         
         const handleCanvasClick = (e: MouseEvent) => {
+            // Skip if we're in selection mode and moving an object
+            if (type === "select" && isMovingObject) {
+                return;
+            }
+            
             const rect = canvas.getBoundingClientRect();
             const clickPosition = {
                 x: e.clientX - rect.left,
@@ -165,7 +206,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
         
         return undefined;
-    }, [type]);
+    }, [type, isMovingObject]);
     
     // Drawing initialization - with prevention of multiple initializations
     useEffect(() => {
@@ -180,7 +221,24 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             }
             
             try {
-                const cleanup = await initDraw(canvas, roomId, socket, userId, type, selectedColor);
+                // Pass additional parameters for object selection and movement tracking
+                const cleanup = await initDraw(
+                    canvas, 
+                    roomId, 
+                    socket, 
+                    userId, 
+                    type, 
+                    selectedColor, 
+                    (id: string) => {
+                        setSelectedObjectId(id);
+                        setIsMovingObject(true);
+                    },
+                    () => {
+                        setIsMovingObject(false);
+                        setSelectedObjectId(null);
+                    },
+                    username
+                );
                 cleanupFunctionRef.current = cleanup;
             } catch (error) {
                 console.error("Error initializing drawing:", error);
@@ -214,7 +272,23 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 // Page is visible again (focus), reinitialize drawing
                 const canvas = canvasRef.current;
                 if (canvas && socket && socket.readyState === WebSocket.OPEN) {
-                    initDraw(canvas, roomId, socket, userId, type, selectedColor)
+                    initDraw(
+                        canvas, 
+                        roomId, 
+                        socket, 
+                        userId, 
+                        type, 
+                        selectedColor,
+                        (id: string) => {
+                            setSelectedObjectId(id);
+                            setIsMovingObject(true);
+                        },
+                        () => {
+                            setIsMovingObject(false);
+                            setSelectedObjectId(null);
+                        },
+                        username
+                    )
                         .then(cleanup => {
                             cleanupFunctionRef.current = cleanup;
                         })
@@ -242,18 +316,28 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             isItalic,
         };
 
+        const textId = Math.random().toString(36).substr(2, 9);
+
         try {
+            const textObject = {
+                type: "text",
+                x: textPosition.x,
+                y: textPosition.y,
+                content: textContent,
+                color: selectedColor,
+                style: textStyle,
+                id: textId
+            };
+
+            // Update local state first
+            setCanvasObjects(prev => ({
+                ...prev,
+                [textId]: textObject
+            }));
+
             socket.send(JSON.stringify({
                 type: "text_element",
-                message: JSON.stringify({
-                    type: "text",
-                    x: textPosition.x,
-                    y: textPosition.y,
-                    content: textContent,
-                    color: selectedColor,
-                    style: textStyle,
-                    id: Math.random().toString(36).substr(2, 9)
-                }),
+                message: JSON.stringify(textObject),
                 roomId,
                 userId
             }));
@@ -310,20 +394,31 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     height = maxHeight;
                     width = width * ratio;
                 }
-                console.log(imageData)
+
+                const imageId = Math.random().toString(36).substr(2, 9);
+                
+                // Create image object
+                const imageObject = {
+                    type: "image",
+                    x: imagePosition.x,
+                    y: imagePosition.y,
+                    width,
+                    height,
+                    src: imageData,
+                    id: imageId
+                };
+
+                // Update local state first
+                setCanvasObjects(prev => ({
+                    ...prev,
+                    [imageId]: imageObject
+                }));
+                
                 // Send image data to other users
                 try {
                     socket.send(JSON.stringify({
                         type: "image_element",
-                        message: JSON.stringify({
-                            type: "image",
-                            x: imagePosition.x,
-                            y: imagePosition.y,
-                            width,
-                            height,
-                            src: imageData,
-                            id: Math.random().toString(36).substr(2, 9)
-                        }),
+                        message: JSON.stringify(imageObject),
                         roomId,
                         userId
                     }));

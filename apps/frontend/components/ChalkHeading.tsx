@@ -1,41 +1,73 @@
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ChalkHeadingProps {
   children: React.ReactNode;
-  color?: 'white' | 'yellow' | 'blue' | 'pink';
+  as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+  color?: 'white' | 'gray' | 'blue';
   className?: string;
-  level?: 1 | 2 | 3 | 4 | 5 | 6;
   animated?: boolean;
-  delay?: string;
+  delay?: number;
 }
 
-const ChalkHeading = ({ 
-  children, 
-  color = 'white', 
-  className, 
-  level = 1,
+const ChalkHeading: React.FC<ChalkHeadingProps> = ({
+  children,
+  as = 'h2',
+  color = 'white',
+  className,
   animated = true,
-  delay = '' 
-}: ChalkHeadingProps) => {
+  delay = 0,
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    const heading = headingRef.current;
+    
+    if (!heading || !animated) {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setTimeout(() => {
+              setIsVisible(true);
+            }, delay * 1000);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(heading);
+
+    return () => {
+      if (heading) observer.unobserve(heading);
+    };
+  }, [animated, delay]);
+
   const colorClasses = {
-    white: 'chalk-text',
-    yellow: 'chalk-text-yellow',
-    blue: 'chalk-text-blue',
-    pink: 'chalk-text-pink',
+    white: 'text-chalk-white',
+    gray: 'text-chalk-gray',
+    blue: 'text-chalk-blue',
   };
 
-  const Component = `h${level}` as keyof JSX.IntrinsicElements;
-  
-  const baseClasses = 'font-hand font-bold tracking-wide';
-  const animationClass = animated ? 'opacity-0 animate-chalk-write' : '';
-  
+  const Component = as;
+
   return (
-    <Component 
+    <Component
+      ref={headingRef}
       className={cn(
-        baseClasses,
+        'chalk-heading',
         colorClasses[color],
-        animationClass,
-        delay,
+        isVisible ? 'opacity-100' : 'opacity-0',
+        animated && 'transition-opacity duration-1000',
         className
       )}
     >

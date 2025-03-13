@@ -1,73 +1,68 @@
+import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
-import AnimatedChalkDust from './AnimatedChalkDust';
 
-interface ChalkButtonProps {
+interface ChalkButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  color?: 'white' | 'yellow' | 'blue' | 'pink';
   className?: string;
-  onClick?: () => void;
-  animated?: boolean;
-  delay?: string;
-  type?: 'button' | 'submit' | 'reset';
+  variant?: 'default' | 'outline' | 'blue';
 }
 
-const ChalkButton = ({ 
-  children, 
-  color = 'white', 
-  className, 
-  onClick,
-  animated = true,
-  delay = '',
-  type = 'button'
-}: ChalkButtonProps) => {
-  const [isHovering, setIsHovering] = useState(false);
-  const [showDust, setShowDust] = useState(false);
-  
-  const colorClasses = {
-    white: 'text-chalk-white border-chalk-white hover:bg-white/5',
-    yellow: 'text-chalk-yellow border-chalk-yellow hover:bg-yellow-50/5',
-    blue: 'text-chalk-blue border-chalk-blue hover:bg-blue-50/5',
-    pink: 'text-chalk-pink border-chalk-pink hover:bg-pink-50/5',
+const ChalkButton: React.FC<ChalkButtonProps> = ({
+  children,
+  className,
+  variant = 'default',
+  ...props
+}) => {
+  const [dusts, setDusts] = useState<{ id: number; x: number; y: number; delay: number }[]>([]);
+
+  const generateDust = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const newDusts: { id: number; x: number; y: number; delay: number; }[] = [];
+    for (let i = 0; i < 5; i++) {
+      newDusts.push({
+        id: Date.now() + i,
+        x: x + (Math.random() * 20 - 10),
+        y: y + (Math.random() * 20 - 10),
+        delay: i * 0.1
+      });
+    }
+    
+    setDusts(prev => [...prev, ...newDusts]);
+    
+    // Remove dusts after animation
+    setTimeout(() => {
+      setDusts(prev => prev.filter(dust => !newDusts.some(newDust => newDust.id === dust.id)));
+    }, 2000);
   };
-  
-  const handleMouseEnter = () => {
-    setIsHovering(true);
-    setShowDust(true);
-    setTimeout(() => setShowDust(false), 1000);
-  };
-  
-  const handleClick = () => {
-    setShowDust(true);
-    setTimeout(() => setShowDust(false), 1000);
-    if (onClick) onClick();
-  };
-  
-  const animationClass = animated ? 'opacity-0 animate-chalk-write' : '';
-  
+
   return (
-    <div className="relative inline-block">
-      <button
-        type={type}
-        className={cn(
-          'relative font-hand tracking-wide py-3 px-8 rounded-lg border-2 border-dashed transform transition-all duration-300',
-          colorClasses[color],
-          'hover:animate-chalk-erase focus:outline-none focus:ring-2 focus:ring-white/20',
-          animationClass,
-          delay,
-          className
-        )}
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setIsHovering(false)}
-      >
-        {children}
-      </button>
-      
-      {showDust && (
-        <AnimatedChalkDust color={color} />
+    <button
+      className={cn(
+        'chalk-button group', // Added group class here directly
+        variant === 'blue' && 'border-chalk-blue text-chalk-blue',
+        variant === 'outline' && 'border-chalk-gray text-chalk-gray',
+        className
       )}
-    </div>
+      onMouseEnter={generateDust}
+      onClick={generateDust}
+      {...props}
+    >
+      {dusts.map((dust) => (
+        <span
+          key={dust.id}
+          className="chalk-dust animate-chalk-dust absolute"
+          style={{
+            left: `${dust.x}px`,
+            top: `${dust.y}px`,
+            animationDelay: `${dust.delay}s`
+          }}
+        />
+      ))}
+      <span className="relative z-10">{children}</span>
+    </button>
   );
 };
 
