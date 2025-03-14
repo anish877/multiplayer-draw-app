@@ -7,24 +7,58 @@ import ChalkInput from "@/components/ChalkInput";
 import ChalkRoom from "@/components/ChalkRoom";
 import { Search, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
-
-// Mock data for rooms
-const mockRooms = [
-  { id: "1", name: "Creative Sketching", users: 10 },
-  { id: "2", name: "Collaborative Art Studio", users: 5 },
-  { id: "3", name: "Design Brainstorming", users: 8 },
-  { id: "4", name: "Quick Doodles", users: 3 },
-  { id: "5", name: "Architecture Planning", users: 6 },
-  { id: "6", name: "UI/UX Workshop", users: 12 },
-];
+import axios from "axios";
+import { useRouter } from 'next/navigation';
 
 const Dashboard = () => {
-  const [rooms, setRooms] = useState(mockRooms);
+  const [rooms, setRooms] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roomName, setRoomName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [dustElements, setDustElements] = useState<JSX.Element[]>([]);
   const createRoomRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // Get token from localStorage
+  const getToken = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("token");
+    }
+    return null;
+  };
+
+  // Fetch rooms from backend
+  const fetchRooms = async () => {
+    try {
+      setIsLoading(true);
+      // For now, we'll use the slug endpoint and manually transform the data
+      // Ideally, you would have a dedicated endpoint to list all rooms
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/rooms`);
+      
+      if (response.data && response.data.rooms) {
+        // Transform the room data to match our component expectations
+        const formattedRooms = response.data.rooms.map((room: { id: { toString: () => any; }; slug: string; }) => ({
+          id: room.id.toString(),
+          name: room.slug.replace(/-/g, ' '), // Convert slug to readable name
+          slug: room.slug,
+          users: 0 // Assuming we don't have user count yet
+        }));
+        
+        setRooms(formattedRooms);
+      }
+    } catch (error) {
+      console.error("Failed to fetch rooms:", error);
+      toast.error("Failed to load rooms");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load rooms when component mounts
+  useEffect(() => {
+    fetchRooms();
+  }, []);
 
   // Filter rooms based on search query
   const filteredRooms = rooms.filter((room) =>
@@ -63,22 +97,45 @@ const Dashboard = () => {
   }, []);
 
   // Create a new room
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
     if (!roomName.trim()) {
       toast.error("Please enter a room name");
       return;
     }
 
-    const newRoom = {
-      id: (rooms.length + 1).toString(),
-      name: roomName,
-      users: 0,
-    };
+    const token = getToken();
+    if (!token) {
+      toast.error("You must be logged in to create a room");
+      // Redirect to login page
+      router.push('/login');
+      return;
+    }
 
-    setRooms([newRoom, ...rooms]);
-    setRoomName("");
-    setIsCreating(false);
-    toast.success(`Room "${roomName}" created successfully!`);
+    try {
+      setIsLoading(true);
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/create-room`, 
+        { name: roomName },
+        {withCredentials: true}
+      );
+
+      if (response.status === 201) {
+        toast.success(`Room "${roomName}" created successfully!`);
+        setRoomName("");
+        setIsCreating(false);
+        // Refresh the room list
+        fetchRooms();
+      }
+    } catch (error) {
+      console.error("Failed to create room:", error);
+      if (error.response?.status === 400 && error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Failed to create room");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Join a room
@@ -86,7 +143,8 @@ const Dashboard = () => {
     const room = rooms.find((r) => r.id === roomId);
     if (room) {
       toast.success(`Joining room: ${room.name}`);
-      // Here you would typically navigate to the room or connect to it
+      // Navigate to the room page
+      router.push(`/canvas/${roomId}`);
     }
   };
 
@@ -125,12 +183,13 @@ const Dashboard = () => {
                 onKeyDown={(e) => e.key === "Enter" && handleCreateRoom()}
                 className="mb-4"
                 autoFocus
+                disabled={isLoading}
               />
               <div className="flex gap-3">
-                <ChalkButton onClick={handleCreateRoom} variant="blue">
-                  Create Room
+                <ChalkButton onClick={handleCreateRoom} variant="blue" disabled={isLoading}>
+                  {isLoading ? "Creating..." : "Create Room"}
                 </ChalkButton>
-                <ChalkButton onClick={() => setIsCreating(false)} variant="outline">
+                <ChalkButton onClick={() => setIsCreating(false)} variant="outline" disabled={isLoading}>
                   Cancel
                 </ChalkButton>
               </div>
@@ -165,7 +224,11 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {filteredRooms.length > 0 ? (
+          {isLoading ? (
+            <div className="chalk-container p-8 text-center">
+              <p className="font-handwriting text-chalk-gray text-xl">Loading rooms...</p>
+            </div>
+          ) : filteredRooms.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {filteredRooms.map((room, index) => (
                 <ChalkRoom

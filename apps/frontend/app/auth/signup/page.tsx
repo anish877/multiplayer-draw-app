@@ -5,6 +5,8 @@ import ChalkHeading from "@/components/ChalkHeading";
 import ChalkButton from "@/components/ChalkButton";
 import { Mail, Lock, User, LogIn, Link } from "lucide-react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
+import { BACKEND_URL } from "@/app/config";
 
 const Signup = () => {
   const [name, setName] = useState("");
@@ -20,12 +22,7 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      // Mock signup for now - would connect to backend in real implementation
-      console.log("Signing up with:", { name, email, password });
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Success - navigate to login
+      const response = await axios.post(BACKEND_URL+"/signup",{name,email,password})
       router.push("/auth/login");
     } catch (err) {
       console.error("Signup error:", err);

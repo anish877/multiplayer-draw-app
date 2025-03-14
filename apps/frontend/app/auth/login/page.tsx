@@ -5,6 +5,9 @@ import ChalkHeading from "@/components/ChalkHeading";
 import ChalkButton from "@/components/ChalkButton";
 import { Mail, Lock, LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
+import { BACKEND_URL } from "@/app/config";
+import { useAuth } from "../verify";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -12,6 +15,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter()
+  const {token,setToken,userId,setUserId,username,setUsername} = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,13 +23,11 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Mock login for now - would connect to backend in real implementation
-      console.log("Logging in with:", { email, password });
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Success - navigate to dashboard (future page)
-      router.push("/");
+      const response = await axios.post(BACKEND_URL+"/login",{email,password},{withCredentials:true})
+        setToken(response.data.token)
+        setUserId(response.data.userId)
+        setUsername(response.data.name)
+        router.push("/dashboard")
     } catch (err) {
       console.error("Login error:", err);
       setError("Invalid email or password. Please try again.");
@@ -61,7 +63,7 @@ const Login = () => {
               <div className="relative">
                 <input
                   id="email"
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

@@ -11,7 +11,7 @@ import axios from "axios";
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors())
+app.use(cors({origin: 'http://localhost:3000',credentials:true}))
 
 app.post("/signup", async (req: Request, res: Response) => {
     const { email, password, name } = req.body;
@@ -65,7 +65,7 @@ app.post("/login", async (req: Request, res: Response) => {
         }
 
         const token = jwt.sign({ id: user.id, email, name: user.name }, JWT_SECRET, { expiresIn: "1d" });
-        res.cookie("uuid", token, { httpOnly: true, secure: true });
+        res.cookie("uuid", token, { httpOnly: true, secure: true, sameSite: "none" });
         res.status(200).json({ email, name: user.name, token , userId : user.id });
         return;
     } catch (error) {
@@ -159,7 +159,31 @@ app.get("/room/:slug",async (req,res)=>{
     }
   })
   res.status(200).json({room})
-})
+});
+
+app.get("/rooms", async (req: Request, res: Response) => {
+  try {
+    const rooms = await prismaClient.room.findMany({
+      orderBy: {
+        id: "desc"
+      },
+      include: {
+        admin: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+    
+    res.status(200).json({ rooms });
+    return;
+  } catch (error) {
+    console.error("Error fetching rooms:", error);
+    res.status(500).json({ message: "Error fetching rooms" });
+    return;
+  }
+});
 
 app.post("/api/generate-drawing", async (req: Request, res: Response) => {
   const { prompt, userId } = req.body;
