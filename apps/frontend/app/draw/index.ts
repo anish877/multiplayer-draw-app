@@ -17,7 +17,7 @@ type Shape = {
     color?: string;
     id?: string;
     iseditable: boolean;
-    userId: string
+    userId: string;
 } | {
     type: "circle";
     startx: number;
@@ -55,6 +55,7 @@ type Shape = {
     y: number;
     width: number;
     height: number;
+    color?: string;
     src: string;
     id?: string;
     iseditable: boolean;
