@@ -149,7 +149,7 @@ const Dashboard = () => {
     if (room) {
       toast.success(`Joining room: ${room.name}`);
       // Navigate to the room page using the slug instead of ID
-      router.push(`/canvas/${room.slug}`);
+      router.push(`/canvas/${room.id}`);
     }
   };
 
