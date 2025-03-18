@@ -11,7 +11,12 @@ import axios from "axios";
 import { useRouter } from 'next/navigation';
 
 const Dashboard = () => {
-  const [rooms, setRooms] = useState([]);
+  const [rooms, setRooms] = useState<Array<{
+    id: string;
+    name: string;
+    slug: string;
+    users: number;
+  }>>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roomName, setRoomName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -126,7 +131,7 @@ const Dashboard = () => {
         // Refresh the room list
         fetchRooms();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create room:", error);
       if (error.response?.status === 400 && error.response?.data?.message) {
         toast.error(error.response.data.message);
@@ -143,8 +148,8 @@ const Dashboard = () => {
     const room = rooms.find((r) => r.id === roomId);
     if (room) {
       toast.success(`Joining room: ${room.name}`);
-      // Navigate to the room page
-      router.push(`/canvas/${roomId}`);
+      // Navigate to the room page using the slug instead of ID
+      router.push(`/canvas/${room.slug}`);
     }
   };
 
