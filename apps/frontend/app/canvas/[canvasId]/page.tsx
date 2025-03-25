@@ -1,29 +1,13 @@
 import RoomCanvas from '@/components/RoomCanvas';
-import { Params } from 'next/dist/server/request/params';
+import { NextPage } from 'next';
 
-// More flexible type definition for page props
-export type CanvasPageProps = {
-  params: Params;
-  searchParams?: { [key: string]: string | string[] | undefined };
-};
+// Ensure Next.js properly infers the `params` type
+interface PageProps {
+  params: { canvasId: string };
+}
 
-// Use a more generic approach to handle params
-const Canvas = ({ params }: CanvasPageProps) => {
-    // Safely extract canvasId, providing a fallback
-    const roomId = params.canvasId ? String(params.canvasId) : '';
-    
-    return (
-        <>
-            <RoomCanvas roomId={roomId} />
-        </>
-    );
+const Canvas: NextPage<PageProps> = ({ params }) => {
+  return <RoomCanvas roomId={params.canvasId} />;
 };
 
 export default Canvas;
-
-// Optional: Add metadata export if needed
-export const generateMetadata = ({ params }: CanvasPageProps) => {
-    return {
-        title: `Canvas: ${params.canvasId || 'New Canvas'}`
-    };
-};
