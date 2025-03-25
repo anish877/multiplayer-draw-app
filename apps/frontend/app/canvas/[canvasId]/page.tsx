@@ -1,13 +1,9 @@
-import RoomCanvas from '@/components/RoomCanvas';
-import { NextPage } from 'next';
+import { PageProps } from "@/.next/types/app/layout";
+import RoomCanvas from "@/components/RoomCanvas";
 
-// Ensure Next.js properly infers the `params` type
-interface PageProps {
-  params: { canvasId: string };
-}
+const Canvas = async ({ params }: PageProps) => {
+    const resolvedParams = await params; // Ensures params is awaited if needed
+    return <RoomCanvas roomId={resolvedParams.canvasId} />;
+  };
 
-const Canvas: NextPage<PageProps> = ({ params }) => {
-  return <RoomCanvas roomId={params.canvasId} />;
-};
-
-export default Canvas;
+  export default Canvas
