@@ -11,7 +11,21 @@ import axios from "axios";
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({origin: 'https://multiplayer-draw-app-frontend.vercel.app',credentials:true}))
+app.use(cors({
+  origin: 'https://multiplayer-draw-app-frontend.vercel.app',
+  credentials: true,
+  methods: "GET,POST,PUT,DELETE,OPTIONS",
+  allowedHeaders: "Content-Type,Authorization",
+}));
+
+app.options("*", (req, res) => {
+  res.header("Access-Control-Allow-Origin", "https://multiplayer-draw-app-frontend.vercel.app");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.sendStatus(204);
+});
+
 
 app.post("/signup", async (req: Request, res: Response) => {
     const { email, password, name } = req.body;
