@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import Link2 from "next/link";
 import ChalkHeading from "@/components/ChalkHeading";
 import ChalkButton from "@/components/ChalkButton";
-import { Mail, Lock, User, LogIn, Link } from "lucide-react";
+import { Mail, Lock, User, LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { BACKEND_URL } from "@/app/config";
@@ -22,7 +22,7 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(BACKEND_URL+"/signup",{name,email,password})
+      await axios.post(BACKEND_URL+"/signup",{name,email,password})
       router.push("/auth/login");
     } catch (err) {
       console.error("Signup error:", err);

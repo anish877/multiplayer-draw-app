@@ -19,12 +19,10 @@ import {
 
 const Index = () => {
   const [dustElements, setDustElements] = useState<JSX.Element[]>([]);
-  const [scrollY, setScrollY] = useState(0);
 
   // Generate chalk dust particles on scroll
   useEffect(() => {
     const handleScroll = () => {
-      setScrollY(window.scrollY);
       
       if (Math.random() > 0.7) {
         const newDust = (

@@ -1,27 +1,35 @@
 'use client';
 
-import { useState, useEffect, useRef, JSX } from "react";
+import { useState, useEffect, useRef, ReactElement } from "react";
 import ChalkHeading from "@/components/ChalkHeading";
 import ChalkButton from "@/components/ChalkButton";
 import ChalkInput from "@/components/ChalkInput";
 import ChalkRoom from "@/components/ChalkRoom";
-import { Search, Plus, Users } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { toast } from "sonner";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { useRouter } from 'next/navigation';
 
+// Define types for rooms and other interfaces
+interface Room {
+  id: string;
+  name: string;
+  slug: string;
+  users: number;
+}
+
+interface RoomResponse {
+  id: string;
+  slug: string;
+}
+
 const Dashboard = () => {
-  const [rooms, setRooms] = useState<Array<{
-    id: string;
-    name: string;
-    slug: string;
-    users: number;
-  }>>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roomName, setRoomName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [dustElements, setDustElements] = useState<JSX.Element[]>([]);
+  const [dustElements, setDustElements] = useState<ReactElement[]>([]);
   const createRoomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -37,14 +45,12 @@ const Dashboard = () => {
   const fetchRooms = async () => {
     try {
       setIsLoading(true);
-      // For now, we'll use the slug endpoint and manually transform the data
-      // Ideally, you would have a dedicated endpoint to list all rooms
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/rooms`);
+      const response = await axios.get<{ rooms: RoomResponse[] }>(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/rooms`);
       
       if (response.data && response.data.rooms) {
         // Transform the room data to match our component expectations
-        const formattedRooms = response.data.rooms.map((room: { id: { toString: () => any; }; slug: string; }) => ({
-          id: room.id.toString(),
+        const formattedRooms = response.data.rooms.map((room: RoomResponse) => ({
+          id: room.id,
           name: room.slug.replace(/-/g, ' '), // Convert slug to readable name
           slug: room.slug,
           users: 0 // Assuming we don't have user count yet
@@ -121,7 +127,10 @@ const Dashboard = () => {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/create-room`, 
         { name: roomName },
-        {withCredentials: true}
+        {
+          withCredentials: true,
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
       );
 
       if (response.status === 201) {
@@ -131,10 +140,12 @@ const Dashboard = () => {
         // Refresh the room list
         fetchRooms();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to create room:", error);
-      if (error.response?.status === 400 && error.response?.data?.message) {
-        toast.error(error.response.data.message);
+      const axiosError = error as AxiosError;
+      if (axiosError.response?.status === 400 && axiosError.response?.data) {
+        const errorData = axiosError.response.data as { message?: string };
+        toast.error(errorData.message || "Failed to create room");
       } else {
         toast.error("Failed to create room");
       }
@@ -148,7 +159,7 @@ const Dashboard = () => {
     const room = rooms.find((r) => r.id === roomId);
     if (room) {
       toast.success(`Joining room: ${room.name}`);
-      // Navigate to the room page using the slug instead of ID
+      // Navigate to the room page using the ID
       router.push(`/canvas/${room.id}`);
     }
   };

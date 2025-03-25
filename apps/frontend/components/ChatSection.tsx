@@ -1,7 +1,6 @@
 import { BACKEND_URL } from '@/app/config';
 import axios from 'axios';
 import React, { useEffect, useState, useRef } from 'react';
-import { useAuth } from '@/app/auth/verify';
 import { Send } from 'lucide-react';
 
 interface Message {
@@ -19,7 +18,6 @@ interface ChatSectionProps {
 const ChatSection: React.FC<ChatSectionProps> = ({ roomId, socket }) => {
   const [messageToSend, setMessageToSend] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const { userId } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {

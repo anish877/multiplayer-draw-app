@@ -54,7 +54,7 @@ const ChatBox = () => {
         <div className="space-y-1 flex flex-col items-end">
           <p className="text-xs text-white/60 font-medium">You</p>
           <p className="text-sm bg-white/10 p-2 rounded-lg inline-block max-w-[85%] break-words">
-            Thanks! I'm working on the UI layout
+            Thanks! I&apos;m working on the UI layout
           </p>
         </div>
       </div>

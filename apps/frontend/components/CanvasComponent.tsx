@@ -50,10 +50,10 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const [isChatVisible, setIsChatVisible] = useState(true);
     const [unreadMessages, setUnreadMessages] = useState(0);
     // Track objects on canvas to prevent duplications
-    const [canvasObjects, setCanvasObjects] = useState<{[id: string]: any}>({});
+    const [,setCanvasObjects] = useState<{[id: string]: unknown}>({});
     // Track when an object is being moved
     const [isMovingObject, setIsMovingObject] = useState(false);
-    const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+    const [,setSelectedObjectId] = useState<string | null>(null);
     const {username} = useAuth();
 
     // Canvas transformation state
@@ -61,8 +61,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const [startPanPoint, setStartPanPoint] = useState({ x: 0, y: 0 });
-    const [minZoom, setMinZoom] = useState(0.1);
-    const [maxZoom, setMaxZoom] = useState(5);
+    const [minZoom] = useState(0.1);
+    const [maxZoom] = useState(5);
     // Add new state for AI Drawing generator modal
     const [showAIDrawingModal, setShowAIDrawingModal] = useState(false);
 
@@ -96,14 +96,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     try {
                         const moveData = JSON.parse(data.message);
                         if (moveData.id) {
-                            setCanvasObjects(prev => ({
-                                ...prev,
-                                [moveData.id]: {
-                                    ...prev[moveData.id],
-                                    x: moveData.x,
-                                    y: moveData.y
-                                }
-                            }));
                         }
                     } catch (err) {
                         console.error('Error parsing move update:', err);
@@ -391,12 +383,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                         setIsMovingObject(false);
                         setSelectedObjectId(null);
                     },
-                    username,
-                    {
-                        scale,
-                        offset,
-                        screenToCanvasCoords: (x: number, y: number) => screenToCanvasCoords(x, y)
-                    }
+                    username
                 );
                 cleanupFunctionRef.current = cleanup;
             } catch (error) {
@@ -416,7 +403,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 cleanupFunctionRef.current = null;
             }
         };
-    }, [roomId, socket, userId, type, selectedColor, scale, offset, screenToCanvasCoords]);
+    }, [roomId, socket, userId, type, selectedColor, scale, offset, screenToCanvasCoords, username]);
 
     // Zoom controls
     const zoomIn = () => {
@@ -898,8 +885,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                         <ChatSection
                             socket={socket}
                             roomId={roomId}
-                            userId={userId}
-                            onNewMessage={() => {/* Do nothing, we're already viewing */}}
                         />
                     </div>
                 )}

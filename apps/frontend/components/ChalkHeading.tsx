@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 interface ChalkHeadingProps {
   children: React.ReactNode;
   as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
-  color?: 'white' | 'gray' | 'blue';
+  color?: 'white' | 'yellow' | 'blue' | 'pink';
   className?: string;
   animated?: boolean;
   delay?: number;
@@ -53,9 +53,10 @@ const ChalkHeading: React.FC<ChalkHeadingProps> = ({
   }, [animated, delay]);
 
   const colorClasses = {
-    white: 'text-chalk-white',
-    gray: 'text-chalk-gray',
-    blue: 'text-chalk-blue',
+    white: 'chalk-text',
+    yellow: 'chalk-text-yellow',
+    blue: 'chalk-text-blue',
+    pink: 'chalk-text-pink',
   };
 
   const Component = as;

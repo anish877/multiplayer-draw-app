@@ -10,7 +10,7 @@ const AuthSection = ({isSignUp}:{isSignUp:boolean}) => {
     const [name,setName] = useState("")
     const [email,setEmail] = useState("")
     const [password,setPassword] = useState("")
-    const {token,setToken,userId,setUserId,username,setUsername} = useAuth()
+    const {token,setToken,setUserId,username,setUsername} = useAuth()
     const router = useRouter()
     const handleSignUp = async ()=>{
         const response = await axios.post(BACKEND_URL+"/signup",{name,email,password})
@@ -30,6 +30,7 @@ const AuthSection = ({isSignUp}:{isSignUp:boolean}) => {
       <input type="text" placeholder='enter name' value={name} onChange={(e)=>setName(e.target.value)}/>
       <input type="text" placeholder='enter email' value={email} onChange={(e)=>setEmail(e.target.value)}/>
       <input type="text" placeholder='enter password' value={password} onChange={(e)=>setPassword(e.target.value)}/>
+      {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
       <button className='text-white' onClick={()=>{isSignUp?handleSignUp():handleLogin()}}>{isSignUp?"SingUp":"Login"}</button>
     </div>
   )

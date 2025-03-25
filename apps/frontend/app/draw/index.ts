@@ -3,6 +3,16 @@ import { BACKEND_URL } from "../config";
 import rough from 'roughjs';
 import { RoughCanvas } from "roughjs/bin/canvas";
 
+// Define a more specific type for drawing options
+interface DrawingOptions {
+    stroke?: string;
+    strokeWidth?: number;
+    fill?: string;
+    fillStyle?: 'solid' | 'hachure' | 'cross-hatch' | 'zigzag' | 'dots';
+    roughness?: number;
+    bowing?: number;
+}
+
 type Point = {
     x: number;
     y: number;
@@ -200,7 +210,7 @@ function isPointInShape(x: number, y: number, shape: Shape): { isInside: boolean
 }
 
 export async function initDraw(
-canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, type: string, selectedColor: string = CHALK_COLORS[0], _p0: (id: string) => void, _p1: () => void, username: string, p0: { scale: number; offset: { x: number; y: number; }; screenToCanvasCoords: (x: number, y: number) => { x: number; y: number; }; }): Promise<() => void> {
+canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, type: string, selectedColor: string = CHALK_COLORS[0], _p0: (id: string) => void, _p1: () => void, username: string): Promise<() => void> {
     let isDrawing = false;
     let isDragging = false;
     let currentShape: Shape | null = null;
@@ -582,7 +592,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
             userId
         }));
         
-        const completedShape = currentShape;
         currentShape = null;
         clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, null);
     };
@@ -737,7 +746,6 @@ function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
   // Define modern styling with reduced padding for a sleeker look
   const paddingX = 12;
   const paddingY = 8;
-  const borderRadius = 12; // Slightly reduced for a more modern look
   
   // Calculate rectangle dimensions and position
   const rectWidth = textWidth + (paddingX * 2);
@@ -898,7 +906,7 @@ async function getExistingShapes(roomId: string, userId: string): Promise<Shape[
         }
         
         return messages
-            .filter((x: any) => x && typeof x.message === 'string')
+            .filter((x: {message:string}) => x && typeof x.message === 'string')
             .map((x: {message: string, userId: string}) => {
                 try {
                     // Fixed: Better error handling for parsing
@@ -906,7 +914,7 @@ async function getExistingShapes(roomId: string, userId: string): Promise<Shape[
                     try {
                         shape = JSON.parse(x.message);
                     } catch (err) {
-                        console.error("Failed to parse shape:", x.message);
+                        console.error("Failed to parse shape:", x.message,err);
                         return null;
                     }
                     
@@ -968,7 +976,7 @@ function drawShape(shape: Shape, ctx: CanvasRenderingContext2D, roughCanvas: Rou
     }
 }
 
-function drawRectangle(shape: Extract<Shape, {type: "rect"}>, roughCanvas: RoughCanvas, options: any) {
+function drawRectangle(shape: Extract<Shape, {type: "rect"}>, roughCanvas: RoughCanvas, options: DrawingOptions) {
     // Ensure width and height are positive (for proper rendering)
     const x = shape.width < 0 ? shape.x + shape.width : shape.x;
     const y = shape.height < 0 ? shape.y + shape.height : shape.y;
@@ -978,7 +986,7 @@ function drawRectangle(shape: Extract<Shape, {type: "rect"}>, roughCanvas: Rough
     roughCanvas.rectangle(x, y, width, height, options);
 }
 
-function drawEllipse(shape: Extract<Shape, {type: "circle"}>, roughCanvas: RoughCanvas, options: any) {
+function drawEllipse(shape: Extract<Shape, {type: "circle"}>, roughCanvas: RoughCanvas, options: DrawingOptions) {
     const radiusX = Math.abs(shape.clientx - shape.startx) * 0.5;
     const radiusY = Math.abs(shape.clienty - shape.starty) * 0.5;
     const centerX = shape.startx + (shape.clientx - shape.startx) * 0.5;
@@ -993,12 +1001,12 @@ function drawEllipse(shape: Extract<Shape, {type: "circle"}>, roughCanvas: Rough
     );
 }
 
-function drawPencil(shape: Extract<Shape, {type: "pencil"}>, ctx: CanvasRenderingContext2D, options: any) {
+function drawPencil(shape: Extract<Shape, {type: "pencil"}>, ctx: CanvasRenderingContext2D, options: DrawingOptions) {
     if (shape.points.length < 2) return;
 
     ctx.save();
-    ctx.strokeStyle = options.stroke;
-    ctx.lineWidth = options.strokeWidth;
+    ctx.strokeStyle = options.stroke || '';
+    ctx.lineWidth = options.strokeWidth || 0;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 

@@ -63,18 +63,18 @@ interface AIDrawingGeneratorProps {
 }
 
 const AIDrawingGenerator: React.FC<AIDrawingGeneratorProps> = ({ roomId, socket, onClose }) => {
-  const [prompt, setPrompt] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [prompt, setPrompt] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const { userId } = useAuth();
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isSending, setIsSending] = useState<boolean>(false);
 
   // Example prompts to help users
-  const examplePrompts = [
+  const examplePrompts: string[] = [
     "A simple landscape with mountains and a lake",
     "A cartoon character with a big smile",
     "A house with a garden and trees",
@@ -83,9 +83,9 @@ const AIDrawingGenerator: React.FC<AIDrawingGeneratorProps> = ({ roomId, socket,
 
   // Draw shapes on preview canvas
   useEffect(() => {
-    if (!previewCanvasRef.current || shapes.length === 0) return;
-    
     const canvas = previewCanvasRef.current;
+    if (!canvas || shapes.length === 0) return;
+    
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
@@ -152,7 +152,7 @@ const AIDrawingGenerator: React.FC<AIDrawingGeneratorProps> = ({ roomId, socket,
     setError(null);
     
     try {
-      const response = await axios.post(`${BACKEND_URL}/api/generate-drawing`, {
+      const response = await axios.post<{ drawing: Shape[] }>(`${BACKEND_URL}/api/generate-drawing`, {
         prompt: prompt.trim(),
         userId
       });
@@ -163,9 +163,9 @@ const AIDrawingGenerator: React.FC<AIDrawingGeneratorProps> = ({ roomId, socket,
       } else {
         setError('Invalid response from the server');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error generating drawing:', err);
-      setError(err.response?.data?.message || 'Failed to generate drawing. Please try again.');
+      setError('Failed to generate drawing. Please try again.');
     } finally {
       setIsLoading(false);
       setIsGenerating(false);
@@ -198,7 +198,8 @@ const AIDrawingGenerator: React.FC<AIDrawingGeneratorProps> = ({ roomId, socket,
       
       // Close the dialog after sending
       onClose();
-    } catch (err) {
+    } catch (err : unknown) {
+      console.log(err)
       setError('Error sending shapes to canvas');
     } finally {
       setIsSending(false);
@@ -268,6 +269,7 @@ const AIDrawingGenerator: React.FC<AIDrawingGeneratorProps> = ({ roomId, socket,
                 <Badge 
                   key={index}
                   className="bg-[#333333] hover:bg-[#444444] text-gray-300 cursor-pointer"
+                  // eslint-disable-next-line react-hooks/rules-of-hooks
                   onClick={() => useExamplePrompt(example)}
                 >
                   {example}

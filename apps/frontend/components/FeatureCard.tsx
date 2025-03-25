@@ -37,7 +37,7 @@ const FeatureCard = ({
       </div>
       
       <ChalkHeading 
-        level={3} 
+        as="h3" 
         color={color} 
         className="text-xl mb-2"
         animated={false}

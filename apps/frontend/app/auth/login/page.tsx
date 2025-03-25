@@ -15,7 +15,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter()
-  const {token,setToken,userId,setUserId,username,setUsername} = useAuth()
+  const {setToken,setUserId,setUsername} = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +112,7 @@ const Login = () => {
         
         <div className="text-center">
           <p className="font-handwriting text-chalk-gray mb-4">
-            Don't have an account yet?
+            Don&apos;t have an account yet?
           </p>
           <Link href="/auth/signup">
             <ChalkButton variant="outline" className="px-8">Create Account</ChalkButton>
