@@ -77,6 +77,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      page-props:
+        specifier: link:@types/next/dist/shared/lib/page-props
+        version: link:@types/next/dist/shared/lib/page-props
       react:
         specifier: ^19.0.0
         version: 19.0.0
