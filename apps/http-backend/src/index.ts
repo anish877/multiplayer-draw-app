@@ -11,7 +11,7 @@ import axios from "axios";
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({origin: 'http://localhost:3000',credentials:true}))
+app.use(cors({origin: '*',credentials:true}))
 
 app.post("/signup", async (req: Request, res: Response) => {
     const { email, password, name } = req.body;
