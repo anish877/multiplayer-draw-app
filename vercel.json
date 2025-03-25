@@ -1,0 +1,27 @@
+{
+    "projects": {
+      "frontend": { "root": "apps/frontend" },
+      "http-backend": { "root": "apps/http-backend" },
+      "ws-backend": { "root": "apps/ws-backend" }
+    },
+    "builds": [
+      {
+        "src": "apps/frontend/package.json",
+        "use": "@vercel/next"
+      },
+      {
+        "src": "apps/http-backend/package.json",
+        "use": "@vercel/node"
+      },
+      {
+        "src": "apps/ws-backend/package.json",
+        "use": "@vercel/node"
+      }
+    ],
+    "routes": [
+      { "src": "/api/(.*)", "dest": "apps/http-backend/$1" },
+      { "src": "/ws/(.*)", "dest": "apps/ws-backend/$1" },
+      { "src": "/(.*)", "dest": "apps/frontend/$1" }
+    ]
+  }
+  
