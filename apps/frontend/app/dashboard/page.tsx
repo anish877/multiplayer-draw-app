@@ -9,6 +9,7 @@ import { Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import axios, { AxiosError } from "axios";
 import { useRouter } from 'next/navigation';
+import { BACKEND_URL } from "../config";
 
 // Define types for rooms and other interfaces
 interface Room {
@@ -45,7 +46,7 @@ const Dashboard = () => {
   const fetchRooms = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get<{ rooms: RoomResponse[] }>(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/rooms`);
+      const response = await axios.get<{ rooms: RoomResponse[] }>(`${BACKEND_URL || 'http://localhost:3001'}/rooms`);
       
       if (response.data && response.data.rooms) {
         // Transform the room data to match our component expectations
@@ -125,7 +126,7 @@ const Dashboard = () => {
     try {
       setIsLoading(true);
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/create-room`, 
+        `${BACKEND_URL || 'http://localhost:3001'}/create-room`, 
         { name: roomName },
         {
           withCredentials: true,
