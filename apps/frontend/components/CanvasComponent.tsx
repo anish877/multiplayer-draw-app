@@ -13,7 +13,6 @@ import AIDrawingGenerator from './AIDrawingGenerator';
 
 type ToolType = "select" | "circle" | "rect" | "pencil" | "image" | "text" | "pan";
 
-// Colors that mimic glowing chalk on a black blackboard
 const CHALK_COLORS = [
     '#ffffff', // white with glow/translucency
     '#f9eaa9', // soft yellow with glow
@@ -46,27 +45,21 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
     const { userId } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Array<{ name: string; userId: string }>>([]);
     const [canvasInitialized, setCanvasInitialized] = useState(false);
-    // Chat toggle state
     const [isChatVisible, setIsChatVisible] = useState(true);
     const [unreadMessages, setUnreadMessages] = useState(0);
-    // Track objects on canvas to prevent duplications
     const [,setCanvasObjects] = useState<{[id: string]: unknown}>({});
-    // Track when an object is being moved
     const [isMovingObject, setIsMovingObject] = useState(false);
     const [,setSelectedObjectId] = useState<string | null>(null);
     const {username} = useAuth();
 
-    // Canvas transformation state
     const [scale, setScale] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const [startPanPoint, setStartPanPoint] = useState({ x: 0, y: 0 });
     const [minZoom] = useState(0.1);
     const [maxZoom] = useState(5);
-    // Add new state for AI Drawing generator modal
     const [showAIDrawingModal, setShowAIDrawingModal] = useState(false);
 
-    // Socket event listener
     useEffect(() => {
         if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
@@ -76,10 +69,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 if (data.type === 'users_update') {
                     setOnlineUsers(data.users);
                 } else if (data.type === 'chat_message' && !isChatVisible) {
-                    // Increment unread count if chat is hidden
                     setUnreadMessages(prev => prev + 1);
                 } else if (data.type === 'canvas_update') {
-                    // Track objects being added to the canvas
                     try {
                         const canvasData = JSON.parse(data.message);
                         if (canvasData.id) {
@@ -113,14 +104,12 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [socket, isChatVisible]);
 
-    // Handle canvas resize with proper debouncing
     useEffect(() => {
         if (!canvasRef.current || !containerRef.current) return;
         
         const handleResize = () => {
             if (!canvasRef.current || !containerRef.current) return;
             
-            // Store the current canvas content
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
             let imageData = null;
@@ -129,23 +118,18 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             }
             
-            // Get container dimensions
             const container = containerRef.current;
             const rect = container.getBoundingClientRect();
             
-            // Set canvas size to match container
             canvas.width = rect.width;
             canvas.height = rect.height;
             
-            // Restore the canvas content if we saved it
             if (imageData && context) {
                 context.putImageData(imageData, 0, 0);
             }
             
             setCanvasInitialized(true);
         };
-
-        // Create a debounced version of handleResize
         let resizeTimeout: NodeJS.Timeout | null = null;
         const debouncedResize = () => {
             if (resizeTimeout) {
@@ -153,11 +137,7 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             }
             resizeTimeout = setTimeout(handleResize, 250);
         };
-
-        // Initial resize
         handleResize();
-
-        // Listen for window resize with debounce
         window.addEventListener('resize', debouncedResize);
         
         return () => {
@@ -168,24 +148,16 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [canvasInitialized]);
 
-    // Apply transformations to canvas context
     const applyTransformations = useCallback((ctx: CanvasRenderingContext2D) => {
-        // Clear canvas with the transformation reset
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         
-        // Apply transformations
         ctx.setTransform(
             scale, 0, 0, scale, 
             offset.x, offset.y
         );
-        
-        // You might want to apply a background here if needed
-        // ctx.fillStyle = "#000000";
-        // ctx.fillRect(-offset.x/scale, -offset.y/scale, ctx.canvas.width/scale, ctx.canvas.height/scale);
     }, [scale, offset]);
 
-    // Convert screen coordinates to canvas coordinates
     const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
         if (!canvasRef.current) return { x: 0, y: 0 };
         
@@ -196,7 +168,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         return { x, y };
     }, [scale, offset]);
 
-    // Handle panning
     const handlePanning = useCallback((e: MouseEvent) => {
         if (!isPanning || type !== "pan") return;
         
@@ -213,18 +184,14 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             y: e.clientY
         });
         
-        // Redraw canvas with new offset
         if (canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) {
                 applyTransformations(ctx);
-                // You would need to redraw all canvas objects here
-                // For simplicity, we'll rely on the useEffect that watches offset changes
             }
         }
     }, [isPanning, type, startPanPoint, applyTransformations]);
 
-    // Start panning
     const startPanning = useCallback((e: MouseEvent) => {
         if (type !== "pan") return;
         
@@ -235,12 +202,10 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         });
     }, [type]);
 
-    // End panning
     const endPanning = useCallback(() => {
         setIsPanning(false);
     }, []);
 
-    // Add panning event listeners
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -256,26 +221,21 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [startPanning, handlePanning, endPanning]);
 
-    // Handle zooming with wheel
     const handleWheel = useCallback((e: WheelEvent) => {
         e.preventDefault();
         
-        // Calculate where in the canvas the mouse is pointing before zoom
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
         
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        
-        // Calculate point in unzoomed canvas coordinates
+
         const pointXBeforeZoom = (mouseX - offset.x) / scale;
         const pointYBeforeZoom = (mouseY - offset.y) / scale;
         
-        // Adjust zoom based on wheel direction
         const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
         const newScale = Math.max(minZoom, Math.min(maxZoom, scale * zoomFactor));
         
-        // Calculate new offsets to zoom towards mouse position
         const newOffsetX = mouseX - pointXBeforeZoom * newScale;
         const newOffsetY = mouseY - pointYBeforeZoom * newScale;
         
@@ -286,7 +246,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         });
     }, [scale, offset, minZoom, maxZoom]);
 
-    // Add wheel event listener
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -298,33 +257,24 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [handleWheel]);
 
-    // Redraw canvas when transformations change
     useEffect(() => {
         if (!canvasRef.current) return;
         
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) {
-            // Clear and apply transformations
             applyTransformations(ctx);
-            
-            // TODO: Redraw all canvas objects here
-            // This would involve drawing each object from canvasObjects
-            // with the current transformations applied
         }
     }, [scale, offset, applyTransformations]);
 
-    // Handle text and image tool clicks
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         
         const handleCanvasClick = (e: MouseEvent) => {
-            // Skip if we're in selection mode and moving an object or panning
             if ((type === "select" && isMovingObject) || type === "pan") {
                 return;
             }
             
-            // Convert screen coordinates to canvas coordinates
             const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
             
             if (type === "text") {
@@ -353,21 +303,17 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         return undefined;
     }, [type, isMovingObject, screenToCanvasCoords]);
     
-    // Drawing initialization - with prevention of multiple initializations
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || !socket || socket.readyState !== WebSocket.OPEN) return;
         
         const setupCanvas = async () => {
-            // Clean up previous drawing instance if it exists
             if (cleanupFunctionRef.current) {
                 cleanupFunctionRef.current();
                 cleanupFunctionRef.current = null;
             }
             
             try {
-                // Pass additional parameters for object selection and movement tracking
-                // We need to also pass the transformation functions and state
                 const cleanup = await initDraw(
                     canvas, 
                     roomId, 
@@ -391,7 +337,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             }
         };
         
-        // Delay setup to ensure canvas is ready
         const timeoutId = setTimeout(() => {
             setupCanvas();
         }, 100);
@@ -405,23 +350,19 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         };
     }, [roomId, socket, userId, type, selectedColor, scale, offset, screenToCanvasCoords, username]);
 
-    // Zoom controls
     const zoomIn = () => {
         const newScale = Math.min(maxZoom, scale * 1.2);
         setScale(newScale);
         
-        // Adjust offset to keep center point fixed when zooming
         if (canvasRef.current) {
             const canvas = canvasRef.current;
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
-            // Calculate how much the center point moves due to scaling
             const scaleDiff = newScale - scale;
             const deltaX = (centerX - offset.x) * (scaleDiff / scale);
             const deltaY = (centerY - offset.y) * (scaleDiff / scale);
             
-            // Adjust offset to compensate
             setOffset({
                 x: offset.x - deltaX,
                 y: offset.y - deltaY
@@ -433,18 +374,15 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         const newScale = Math.max(minZoom, scale / 1.2);
         setScale(newScale);
         
-        // Adjust offset to keep center point fixed when zooming
         if (canvasRef.current) {
             const canvas = canvasRef.current;
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
-            // Calculate how much the center point moves due to scaling
             const scaleDiff = newScale - scale;
             const deltaX = (centerX - offset.x) * (scaleDiff / scale);
             const deltaY = (centerY - offset.y) * (scaleDiff / scale);
             
-            // Adjust offset to compensate
             setOffset({
                 x: offset.x - deltaX,
                 y: offset.y - deltaY
@@ -480,7 +418,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                 id: textId
             };
 
-            // Update local state first
             setCanvasObjects(prev => ({
                 ...prev,
                 [textId]: textObject
@@ -500,7 +437,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         }
     };
 
-    // Handle image file selection with size validation
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0 || !socket || socket.readyState !== WebSocket.OPEN) return;
         
@@ -510,7 +446,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             return;
         }
 
-        // Check file size (limit to 5MB)
         if (file.size > 5 * 1024 * 1024) {
             alert('Image size too large. Please select an image under 5MB.');
             if (fileInputRef.current) {
@@ -524,11 +459,8 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             if (!event.target || typeof event.target.result !== 'string') return;
             
             const imageData = event.target.result;
-            
-            // Create an image element to get dimensions
             const img = new Image();
             img.onload = () => {
-                // Calculate scaled dimensions to prevent oversized images
                 const maxWidth = 800;
                 const maxHeight = 600;
                 let width = img.width;
@@ -548,7 +480,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
 
                 const imageId = Math.random().toString(36).substr(2, 9);
                 
-                // Create image object
                 const imageObject = {
                     type: "image",
                     x: imagePosition.x,
@@ -559,13 +490,11 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
                     id: imageId
                 };
 
-                // Update local state first
                 setCanvasObjects(prev => ({
                     ...prev,
                     [imageId]: imageObject
                 }));
                 
-                // Send image data to other users
                 try {
                     socket.send(JSON.stringify({
                         type: "image_element",
@@ -582,13 +511,11 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         
         reader.readAsDataURL(file);
         
-        // Reset file input
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
 
-    // Color picker component
     const ColorPicker = () => (
         <div className="grid grid-cols-6 gap-2 p-2">
             {CHALK_COLORS.map((color) => (
@@ -616,7 +543,6 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
         { type: "pan", icon: Move, label: "Pan" }
     ] as const;
 
-    // Handle keyboard events for text input
     const handleTextKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
             setShowTextInput(false);
@@ -624,17 +550,13 @@ const CanvasComponent = ({roomId, socket}: {roomId: string, socket: WebSocket}) 
             handleTextSubmit();
         }
     };
-
-    // Toggle chat visibility
     const toggleChat = () => {
         setIsChatVisible(!isChatVisible);
-        // Reset unread count when opening chat
         if (!isChatVisible) {
             setUnreadMessages(0);
         }
     };
 
-    // Socket connection status check
     const isSocketConnected = socket && socket.readyState === WebSocket.OPEN;
 
     return (
