@@ -3,7 +3,6 @@ import { BACKEND_URL } from "../config";
 import rough from 'roughjs';
 import { RoughCanvas } from "roughjs/bin/canvas";
 
-// Define a more specific type for drawing options
 interface DrawingOptions {
     stroke?: string;
     strokeWidth?: number;
@@ -83,46 +82,37 @@ const CHALK_COLORS = [
     '#9e31f5', // purple
 ];
 
-// Add these to your state variables
-let showingUserId: Shape | null = null; // Will store the shape we're showing the userId for
-let userIdTimeout: string | number | NodeJS.Timeout | null | undefined = null; // For clearing the timeout when needed
+let showingUserId: Shape | null = null; 
+let userIdTimeout: string | number | NodeJS.Timeout | null | undefined = null; 
 
-// Add isPointInImage function for selection
 function isPointInImage(x: number, y: number, image: Extract<Shape, {type: "image"}>): boolean {
     return x >= image.x && x <= image.x + image.width && 
            y >= image.y && y <= image.y + image.height;
 }
 
-// Generate a simple unique ID
 function generateId(): string {
-    // Fixed: Return the actual value instead of concatenating functions
     return Math.random().toString(36).substring(2, 9) + Date.now().toString();
 }
 
-// Check if point is inside rectangle
 function isPointInRect(x: number, y: number, rect: Extract<Shape, {type: "rect"}>): boolean {
     return x >= rect.x && x <= rect.x + rect.width && 
            y >= rect.y && y <= rect.y + rect.height;
 }
 
-// Check if point is inside circle
 function isPointInCircle(x: number, y: number, circle: Extract<Shape, {type: "circle"}>): boolean {
     const radiusX = Math.abs(circle.clientx - circle.startx) * 0.5;
     const radiusY = Math.abs(circle.clienty - circle.starty) * 0.5;
     const centerX = circle.startx + (circle.clientx - circle.startx) * 0.5;
     const centerY = circle.starty + (circle.clienty - circle.starty) * 0.5;
     
-    // Calculate normalized distance
     const dx = (x - centerX) / radiusX;
     const dy = (y - centerY) / radiusY;
     return (dx * dx + dy * dy) <= 1;
 }
 
-// Check if point is inside pencil shape (approximation using bounding box of points)
 function isPointInPencil(x: number, y: number, pencil: Extract<Shape, {type: "pencil"}>): boolean {
     if (pencil.points.length < 2) return false;
     
-    // Find bounding box
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     pencil.points.forEach(point => {
         minX = Math.min(minX, point.x);
@@ -131,41 +121,33 @@ function isPointInPencil(x: number, y: number, pencil: Extract<Shape, {type: "pe
         maxY = Math.max(maxY, point.y);
     });
     
-    // Add some padding for easier selection
     const padding = 5;
     return x >= minX - padding && x <= maxX + padding && 
            y >= minY - padding && y <= maxY + padding;
 }
 
-// Check if point is inside text
 function isPointInText(x: number, y: number, text: Extract<Shape, {type: "text"}>): boolean {
-    // Approximate text area based on content and font size
     const style = text.style || { fontSize: 16, isBold: false, isItalic: false };
     const lineHeight = style.fontSize * 1.2;
     const lines = text.content.split('\n');
     const height = lines.length * lineHeight;
-    const width = Math.max(...lines.map(line => line.length * (style.fontSize * 0.6))); // better estimate
+    const width = Math.max(...lines.map(line => line.length * (style.fontSize * 0.6))); 
     
     return x >= text.x && x <= text.x + width && 
            y >= text.y && y <= text.y + height;
 }
 
 function drawImage(shape: Extract<Shape, {type: "image"}>, ctx: CanvasRenderingContext2D) {
-    // Create a new image element
     const img = new Image();
     
-    // Set the image source to trigger loading
     img.src = shape.src;
     
-    // Set a onload handler to draw the image once it's loaded
     img.onload = () => {
         ctx.drawImage(img, shape.x, shape.y, shape.width, shape.height);
     };
     
-    // Handle potential errors
     img.onerror = () => {
         console.error('Error loading image');
-        // Draw a placeholder with an error message
         ctx.save();
         ctx.fillStyle = '#ff6666';
         ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
@@ -215,17 +197,15 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
     let isDragging = false;
     let currentShape: Shape | null = null;
     let selectedShape: Shape | null = null;
-    let oldSelectedShape: Shape | null = null; // Store original state for deletion
+    let oldSelectedShape: Shape | null = null;
     let dragOffsetX = 0;
     let dragOffsetY = 0;
     
     const ctx = canvas.getContext("2d");
-    if (!ctx) return () => {}; // Return empty cleanup function if no context
+    if (!ctx) return () => {}; 
 
-    // Initialize RoughJS
     const roughCanvas = rough.canvas(canvas);
     
-    // Set up drawing style
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.lineWidth = 2;
@@ -234,14 +214,11 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
     let existingShapes: Shape[] = await getExistingShapes(roomId, userId);
     clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
 
-    // Store message handler reference so we can remove it later
-    // Update handleSocketMessage to properly parse and handle messages
     const handleSocketMessage = (e: MessageEvent) => {
         try {
             const message = JSON.parse(e.data);
             
             if (message.type === "chat" || message.type === "image_element") {
-                // Fixed: Proper parsing of messages
                 let parsedShape: Shape;
                 
                 if (message.type === "chat") {
@@ -260,12 +237,10 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                     }
                 }
                 
-                // Check if this is an update to an existing shape
                 const existingIndex = existingShapes.findIndex(s => s.id === parsedShape.id);
                 if (existingIndex >= 0) {
                     existingShapes[existingIndex] = parsedShape;
                 } else {
-                    // Fixed: Set iseditable properly
                     if (message.userId === userId) {
                         parsedShape.iseditable = true;
                     } else {
@@ -277,13 +252,10 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                 clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
             } else if (message.type === "delete_chat") {
                 try {
-                    // Fixed: Proper parsing of deleted shape
                     const deletedShape = JSON.parse(message.message);
                     
-                    // Find and remove the shape with matching ID
                     existingShapes = existingShapes.filter(s => s.id !== deletedShape.id);
                     
-                    // If the deleted shape was selected, deselect it
                     if (selectedShape && selectedShape.id === deletedShape.id) {
                         selectedShape = null;
                         oldSelectedShape = null;
@@ -299,26 +271,21 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
         }
     };
 
-    // Add the message handler
     socket.addEventListener("message", handleSocketMessage);
 
-    // Define event handler functions
     const handleMouseDown = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
     
-        // Clear any existing userId display timeout
         if (userIdTimeout) {
             clearTimeout(userIdTimeout);
             userIdTimeout = null;
         }
         showingUserId = null;
     
-        // Check if we're clicking on an existing shape, but only in select mode
         if (type === "select") {
             let found = false;
-            // Iterate in reverse to select the topmost shape first
             for (let i = existingShapes.length - 1; i >= 0; i--) {
                 const shape = existingShapes[i];
                 const result = isPointInShape(x, y, shape);
@@ -327,13 +294,10 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                     found = true;
                     
                     if (result.isEditable) {
-                        // Handle editable shape (existing code)
                         selectedShape = shape;
-                        // Store original shape for deletion
                         oldSelectedShape = JSON.parse(JSON.stringify(shape));
                         isDragging = true;
                         
-                        // Calculate drag offset
                         if (shape.type === "rect" || shape.type === "image") {
                             dragOffsetX = x - shape.x;
                             dragOffsetY = y - shape.y;
@@ -355,20 +319,17 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                             dragOffsetY = y - shape.y;
                         }
                     } else {
-                        // Show userId for non-editable shape directly on canvas
                         selectedShape = null;
                         oldSelectedShape = null;
                         isDragging = false;
                         
-                        // Display userId on the shape
                         if (shape.userId) {
                             showingUserId = shape;
                             
-                            // Set a timeout to hide the userId after a few seconds
                             userIdTimeout = setTimeout(() => {
                                 showingUserId = null;
                                 clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
-                            }, 3000); // Show for 3 seconds
+                            }, 3000); 
                         }
                     }
                     
@@ -385,9 +346,8 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
             return;
         }
         
-        // If not in select mode, start drawing
         isDrawing = true;
-        selectedShape = null; // Clear any selection when starting to draw
+        selectedShape = null; 
         oldSelectedShape = null;
         
         switch (type) {
@@ -444,7 +404,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                     userId: username
                 };
                 
-                // Show a prompt to enter text
                 const textContent = prompt("Enter text:", "");
                 if (textContent !== null) {
                     currentShape.content = textContent;
@@ -462,7 +421,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                 break;
         }
         
-        // Draw the initial state of the current shape
         if (currentShape) {
             clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, selectedShape, currentShape);
         }
@@ -473,9 +431,7 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
     
-        // Only allow dragging in select mode
         if (isDragging && selectedShape && type === "select") {
-            // Move the selected shape
             if (selectedShape.type === "rect" || selectedShape.type === "image" || selectedShape.type === "text") {
                 selectedShape.x = x - dragOffsetX;
                 selectedShape.y = y - dragOffsetY;
@@ -526,16 +482,13 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
     };
     
     const handleMouseUp = () => {
-        // Only handle shape movement in select mode
         if (isDragging && selectedShape && oldSelectedShape && type === "select") {
             isDragging = false;
             
-            // Don't send updates if nothing changed
             if (JSON.stringify(selectedShape) === JSON.stringify(oldSelectedShape)) {
                 return;
             }
             
-            // Delete old shape position first
             socket.send(JSON.stringify({
                 type: "delete_chat",
                 message: JSON.stringify(oldSelectedShape),
@@ -543,7 +496,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                 userId
             }));
             
-            // Send updated shape to server
             socket.send(JSON.stringify({
                 type: "chat",
                 message: JSON.stringify(selectedShape),
@@ -557,7 +509,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
         
         if (!currentShape || !isDrawing) return;
         
-        // Ensure we're only saving shapes with actual content
         if (currentShape.type === "pencil" && currentShape.points.length <= 1) {
             isDrawing = false;
             currentShape = null;
@@ -597,7 +548,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
     };
 
     const handleMouseLeave = () => {
-        // If we're in the middle of drawing, finish the shape
         if (isDrawing && currentShape) {
             handleMouseUp();
         }
@@ -606,20 +556,15 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
         isDragging = false;
     };
     
-    // Add event listeners
     canvas.addEventListener("mousedown", handleMouseDown);
     canvas.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("mouseup", handleMouseUp);
     canvas.addEventListener("mouseleave", handleMouseLeave);
     
-    // Add event listener for delete key
     const handleKeyDown = (e: KeyboardEvent) => {
-        // Fixed: Check if we have a selected shape and ensure it's editable
         if ((e.key === "Delete" || e.key === "Backspace") && selectedShape && selectedShape.iseditable) {
-            // Remove from existing shapes
             existingShapes = existingShapes.filter(s => s.id !== selectedShape?.id);
             
-            // Send delete message to server
             socket.send(JSON.stringify({
                 type: "delete_chat",
                 message: JSON.stringify(selectedShape),
@@ -627,12 +572,10 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
                 userId
             }));
             
-            // Clear selection and redraw
             selectedShape = null;
             oldSelectedShape = null;
             clearCanvasAndDrawAll(existingShapes, canvas, ctx, roughCanvas, null, currentShape);
             
-            // Prevent default behavior (page navigation on backspace)
             if (e.key === "Backspace") {
                 e.preventDefault();
             }
@@ -641,7 +584,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
     
     document.addEventListener("keydown", handleKeyDown);
     
-    // Return the cleanup function
     return () => {
         canvas.removeEventListener("mousedown", handleMouseDown);
         canvas.removeEventListener("mousemove", handleMouseMove);
@@ -652,7 +594,6 @@ canvas: HTMLCanvasElement, roomId: string, socket: WebSocket, userId: string, ty
     };
 }
 
-// New modified function that includes drawing userId text
 export function clearCanvasAndDrawAll(
     existingShapes: Shape[], 
     canvas: HTMLCanvasElement, 
@@ -663,36 +604,28 @@ export function clearCanvasAndDrawAll(
 ) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw all existing shapes
     existingShapes.forEach(shape => {
-        // Skip selected shape - we'll draw it last
         if (selectedShape && shape.id === selectedShape.id) return;
         drawShape(shape, ctx, roughCanvas);
     });
     
-    // Draw the current shape being created (if any)
     if (currentShape) {
         drawShape(currentShape, ctx, roughCanvas);
     }
     
-    // Draw selected shape last (so it appears on top with selection indicator)
     if (selectedShape) {
         drawSelectionIndicator(selectedShape, ctx);
         drawShape(selectedShape, ctx, roughCanvas);
     }
     
-    // Draw userId if we are showing it
     if (showingUserId) {
         drawUserId(showingUserId, ctx);
     }
 }
 
-// Function to draw the userId on the shape
 function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
-  // Save context for restoring later
   ctx.save();
   
-  // Calculate position for the userId text
   let textX, textY;
   switch (shape.type) {
     case "rect":
@@ -701,14 +634,12 @@ function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
       textY = shape.y + (shape.height / 2);
       break;
     case "circle":
-      // For circle, find center point
       const radiusX = Math.abs(shape.clientx - shape.startx) / 2;
       const radiusY = Math.abs(shape.clienty - shape.starty) / 2;
       textX = shape.startx + (shape.clientx - shape.startx > 0 ? radiusX : -radiusX);
       textY = shape.starty + (shape.clienty - shape.starty > 0 ? radiusY : -radiusY);
       break;
     case "pencil":
-      // For pencil, find center point of all points
       let sumX = 0, sumY = 0;
       shape.points.forEach((point: { x: number; y: number; }) => {
         sumX += point.x;
@@ -726,51 +657,40 @@ function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
       textY = 0;
   }
   
-  // Ensure coordinates are integers for crisp rendering
   textX = Math.round(textX);
   textY = Math.round(textY);
   
-  // Format the user ID
   const userId = `@${shape.userId}`;
   
-  // Set text styling with a more modern font stack
   ctx.font = "500 14px 'SF Pro Display', 'Inter', system-ui, -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   
-  // Calculate text dimensions
   const textMetrics = ctx.measureText(userId);
   const textWidth = textMetrics.width;
-  const textHeight = 14; // Approximate height based on font size
+  const textHeight = 14; 
   
-  // Define modern styling with reduced padding for a sleeker look
   const paddingX = 12;
   const paddingY = 8;
   
-  // Calculate rectangle dimensions and position
   const rectWidth = textWidth + (paddingX * 2);
   const rectHeight = textHeight + (paddingY * 2);
   const rectX = textX - (rectWidth / 2);
   const rectY = textY - (rectHeight / 2);
   
-  // Generate a vibrant but dark color suitable for a blackish canvas
-  // Using HSL for better control over luminosity
-  const hue = Math.floor(Math.random() * 360); // Random hue (0-359)
-  const saturation = 70 + Math.floor(Math.random() * 30); // High saturation (70-99%)
-  const lightness = 40 + Math.floor(Math.random() * 15); // Medium-low lightness (40-54%)
+  const hue = Math.floor(Math.random() * 360); 
+  const saturation = 70 + Math.floor(Math.random() * 30); 
+  const lightness = 40 + Math.floor(Math.random() * 15); 
   const badgeColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   
-  // Add subtle glow effect instead of shadow
   ctx.shadowColor = `hsla(${hue}, ${saturation}%, ${lightness + 20}%, 0.4)`;
   ctx.shadowBlur = 8;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
   
-  // Draw pill-shaped badge (fully rounded rectangle)
   ctx.beginPath();
-  const arcRadius = rectHeight / 2; // Make it pill-shaped
+  const arcRadius = rectHeight / 2; 
   
-  // Draw the pill shape
   ctx.moveTo(rectX + arcRadius, rectY);
   ctx.lineTo(rectX + rectWidth - arcRadius, rectY);
   ctx.arcTo(rectX + rectWidth, rectY, rectX + rectWidth, rectY + arcRadius, arcRadius);
@@ -781,26 +701,21 @@ function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
   ctx.lineTo(rectX, rectY + arcRadius);
   ctx.arcTo(rectX, rectY, rectX + arcRadius, rectY, arcRadius);
   ctx.closePath();
-  
-  // Add gradient fill for a more modern look
   const gradient = ctx.createLinearGradient(rectX, rectY, rectX, rectY + rectHeight);
   gradient.addColorStop(0, badgeColor);
   gradient.addColorStop(1, `hsl(${(hue + 20) % 360}, ${saturation}%, ${Math.max(25, lightness - 15)}%)`);
   ctx.fillStyle = gradient;
   ctx.fill();
   
-  // Add subtle inner border
   ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness + 15}%, 0.6)`;
   ctx.lineWidth = 1;
   ctx.stroke();
   
-  // Reset shadow settings before drawing text
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
   
-  // Draw text in white with subtle text shadow for better readability
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
   ctx.shadowBlur = 2;
@@ -808,12 +723,10 @@ function drawUserId(shape: Shape, ctx: CanvasRenderingContext2D) {
   ctx.shadowOffsetY = 1;
   ctx.fillText(userId, textX, textY);
   
-  // Restore context
   ctx.restore();
 }
 
 
-// Keep the original clearCanvas for compatibility
 export function clearCanvas(
     existingShapes: Shape[], 
     canvas: HTMLCanvasElement, 
@@ -826,9 +739,9 @@ export function clearCanvas(
 
 function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
     ctx.save();
-    ctx.strokeStyle = '#00ff00'; // Green selection indicator
+    ctx.strokeStyle = '#00ff00'; 
     ctx.lineWidth = 1;
-    ctx.setLineDash([5, 5]); // Dashed line
+    ctx.setLineDash([5, 5]); 
     
     if (shape.type === "rect") {
         ctx.strokeRect(
@@ -855,7 +768,6 @@ function drawSelectionIndicator(shape: Shape, ctx: CanvasRenderingContext2D) {
     } else if (shape.type === "pencil") {
         if (shape.points.length < 2) return;
         
-        // Find bounding box
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         shape.points.forEach(point => {
             minX = Math.min(minX, point.x);
@@ -909,7 +821,6 @@ async function getExistingShapes(roomId: string, userId: string): Promise<Shape[
             .filter((x: {message:string}) => x && typeof x.message === 'string')
             .map((x: {message: string, userId: string}) => {
                 try {
-                    // Fixed: Better error handling for parsing
                     let shape: Shape;
                     try {
                         shape = JSON.parse(x.message);
@@ -918,19 +829,16 @@ async function getExistingShapes(roomId: string, userId: string): Promise<Shape[
                         return null;
                     }
                     
-                    // Set editable flag based on ownership
                     if(x.userId === userId) {
                         shape.iseditable = true;
                     } else {
                         shape.iseditable = false;
                     }
                     
-                    // Ensure each shape has an ID
                     if (!shape.id) {
                         shape.id = generateId();
                     }
                     
-                    // Validate shape type
                     if (!['rect', 'circle', 'pencil', 'text', 'image'].includes(shape.type)) {
                         return null;
                     }
@@ -977,7 +885,6 @@ function drawShape(shape: Shape, ctx: CanvasRenderingContext2D, roughCanvas: Rou
 }
 
 function drawRectangle(shape: Extract<Shape, {type: "rect"}>, roughCanvas: RoughCanvas, options: DrawingOptions) {
-    // Ensure width and height are positive (for proper rendering)
     const x = shape.width < 0 ? shape.x + shape.width : shape.x;
     const y = shape.height < 0 ? shape.y + shape.height : shape.y;
     const width = Math.abs(shape.width);
@@ -1009,20 +916,14 @@ function drawPencil(shape: Extract<Shape, {type: "pencil"}>, ctx: CanvasRenderin
     ctx.lineWidth = options.strokeWidth || 0;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    // Add some roughness to the line
     ctx.beginPath();
     ctx.moveTo(shape.points[0].x, shape.points[0].y);
     
     for (let i = 1; i < shape.points.length; i++) {
         const point = shape.points[i];
         const prevPoint = shape.points[i - 1];
-        
-        // Add slight random offset to create roughness
         const offsetX = (Math.random() - 0.5) * 0.5;
         const offsetY = (Math.random() - 0.5) * 0.5;
-        
-        // Create control points for quadratic curve
         const cp1x = prevPoint.x + offsetX;
         const cp1y = prevPoint.y + offsetY;
         
@@ -1037,8 +938,6 @@ function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingCon
     if (!shape.content) return;
     
     ctx.save();
-    
-    // Apply text styles
     const style = shape.style || { fontSize: 16, isBold: false, isItalic: false };
     const fontWeight = style.isBold ? 'bold' : 'normal';
     const fontStyle = style.isItalic ? 'italic' : 'normal';
@@ -1046,10 +945,8 @@ function drawText(shape: Extract<Shape, {type: "text"}>, ctx: CanvasRenderingCon
     
     ctx.fillStyle = shape.color || '#ffffff';
     ctx.textBaseline = 'top';
-    
-    // Split text into lines and draw each line
     const lines = shape.content.split('\n');
-    const lineHeight = style.fontSize * 1.2; // Add some line spacing
+    const lineHeight = style.fontSize * 1.2; 
     
     lines.forEach((line, index) => {
         ctx.fillText(line, shape.x, shape.y + (index * lineHeight));
