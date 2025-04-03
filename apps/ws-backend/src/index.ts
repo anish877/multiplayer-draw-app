@@ -156,7 +156,7 @@ wss.on("connection",(ws,request)=>{
                 }
                 else if(parsedData.type === "image_element") {
                     // Validate required fields
-                    if (!parsedData.roomId || !parsedData.message || !parsedData.userId || !parsedData.name) {
+                    if (!parsedData.roomId || !parsedData.message || !parsedData.userId) {
                         return;
                     }
                     
